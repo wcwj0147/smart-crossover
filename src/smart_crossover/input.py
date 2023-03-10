@@ -9,22 +9,25 @@ class MCFInput:
     Information of the LP model for a general MCF problem:
              min      c^T x
              s.t.     A x  = b
-                   0 <= x <= u
+                   l <= x <= u
     """
 
     A: Union[scipy.sparse.csr_matrix, np.ndarray]
     b: np.ndarray
     c: np.ndarray
+    l: np.ndarray
     u: np.ndarray
 
     def __init__(self,
                  A: Union[scipy.sparse.csr_matrix, np.ndarray],
                  b: np.ndarray,
                  c: np.ndarray,
+                 l: np.ndarray,
                  u: np.ndarray) -> None:
         self.A = A
         self.b = b
         self.c = c
+        self.l = l
         self.u = u
 
 
