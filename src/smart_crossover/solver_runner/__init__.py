@@ -3,6 +3,7 @@ import gurobipy
 import numpy as np
 
 from smart_crossover.input import MCFInput
+from smart_crossover.output import Basis
 
 
 # Add mosek and cplex later...
@@ -19,17 +20,19 @@ class SolverRunner(Protocol):
         ...
 
     def add_warm_start_basis(self,
-                             vbasis: np.ndarray,
-                             cbasis: np.ndarray) -> None:
+                             basis: Basis) -> None:
         ...
 
-    def return_basis(self) -> Tuple[np.ndarray, np.ndarray]:
+    def return_basis(self) -> Basis:
         ...
 
     def return_MCF_model(self) -> MCFInput:
         ...
 
     def return_x(self) -> np.ndarray:
+        ...
+
+    def return_y(self) -> np.ndarray:
         ...
 
     def return_obj_val(self) -> float:
@@ -42,6 +45,9 @@ class SolverRunner(Protocol):
         ...
 
     def return_reduced_cost(self) -> np.ndarray:
+        ...
+
+    def turn_off_presolve(self) -> None:
         ...
 
     def run_barrier(self) -> None:
