@@ -6,7 +6,7 @@ import numpy as np
 import scipy
 
 from smart_crossover.input import MCFInput
-from smart_crossover.output import Output
+from smart_crossover.output import Output, Basis
 from smart_crossover.solver_runner import SolverRunner
 
 
@@ -34,10 +34,11 @@ class GrbRunner(SolverRunner):
 
     def read_mcf_input(self, mcf_input: MCFInput) -> None:
         model = gurobipy.Model()
-        x = model.addMVar(shape=mcf_input.c.size, lb=mcf_input.l, ub=mcf_input.u)
+        x = model.addMVar(shape=mcf_input.c.size, lb=mcf_input.l, ub=mcf_input.u, name='x')
         model.setObjective(mcf_input.c @ x, GRB.MINIMIZE)
-        model.addMConstr(mcf_input.A, x, '=', mcf_input.b)
+        model.addMConstr(mcf_input.A, x, '=', mcf_input.b, name='Ax')
         self.model = model
+        self.model.update()  # Let MVar, MConstr info to appear in the model (why?)
 
     def get_A(self) -> scipy.sparse.csr_matrix:
         return self.model.getA()
@@ -55,17 +56,15 @@ class GrbRunner(SolverRunner):
         return np.array(self.model.getAttr("UB", self.model.getVars()))
 
     def add_warm_start_basis(self,
-                             vbasis: np.ndarray,
-                             cbasis: np.ndarray) -> None:
-        for i, var in enumerate(self.model.getVars()):
-            var.VBasis = vbasis[i]
-        for j, constr in enumerate(self.model.getConstrs()):
-            constr.CBasis = cbasis[j]
+                             basis: Basis) -> None:
+        self.model.setAttr("VBasis", self.model.getVars(), basis.vbasis.tolist())
+        self.model.setAttr("CBasis", self.model.getConstrs(), basis.cbasis.tolist())
+        self.model.setParam("LPWarmStart", 2)  # Make warm-start basis work when conduct presolve.
 
-    def return_basis(self) -> Tuple[np.ndarray, np.ndarray]:
-        vbasis = np.array([var.VBasis for var in self.model.getVars()])
-        cbasis = np.array([constr.CBasis for constr in self.model.getConstrs()])
-        return vbasis, cbasis
+    def return_basis(self) -> Basis:
+        vbasis = np.array(self.model.getAttr("VBasis", self.model.getVars()))
+        cbasis = np.array(self.model.getAttr("CBasis", self.model.getConstrs()))
+        return Basis(vbasis, cbasis)
 
     def turn_off_presolve(self) -> None:
         self.model.setParam("Presolve", 0)
@@ -89,7 +88,7 @@ class GrbRunner(SolverRunner):
         self._run()
 
     def run_simplex(self) -> None:
-        self.model.setParam("Method", 1)
+        self.model.setParam("Method", 0)
         self._set_log()
         self._set_time_limit()
         self._run()
@@ -109,6 +108,9 @@ class GrbRunner(SolverRunner):
     def return_x(self) -> np.ndarray:
         assert self.model.Status == GRB.OPTIMAL, "The model is not solved to optimal!"
         return np.array(self.model.getAttr("X", self.model.getVars()))
+
+    def return_y(self) -> np.ndarray:
+        return np.array(self.model.getAttr("Pi", self.model.getConstrs()))
 
     def return_obj_val(self) -> float:
         return self.model.ObjVal
