@@ -1,20 +1,18 @@
-import time
+import datetime
 
 import gurobipy
 import numpy as np
 import scipy.sparse as sp
 
-from smart_crossover import get_project_root
 from smart_crossover.input import MCFInput
 from smart_crossover.output import Output, Basis
-from smart_crossover.solver_runner.gurobi_runner import GrbRunner
-from smart_crossover.solver_runner.utils import generate_runner
+from smart_crossover.solver_caller.caller import generate_caller
 
 
 def cnet_mcf(mcf_input: MCFInput,
              x: np.ndarray,
              solver: str = "GRB") -> Output:
-    sort_start_time = time.time()
+    sort_start_time = datetime.datetime.now()
 
     # preparation
     A = mcf_input.A
@@ -56,8 +54,8 @@ def cnet_mcf(mcf_input: MCFInput,
     # set expanding ratio for column generation
     COLUMN_GENERATION_RATIO = 2
 
-    sort_time = time.time() - sort_start_time
-    cg_start_time_1 = time.time()
+    sort_time = datetime.datetime.now() - sort_start_time
+    cg_start_time_1 = datetime.datetime.now()
 
     # set extended problem
     assert np.sum(A.multiply(mask_large_x) @ (u * mask_large_x)) == 0, "Partial flow is not valid."
@@ -80,12 +78,12 @@ def cnet_mcf(mcf_input: MCFInput,
     k = int(1.2 * m)
     flag = True
 
-    t_1 = cg_start_time_1 - time.time()
+    t_1 = cg_start_time_1 - datetime.datetime.now()
     t_2, t_3 = 0, 0
     iter_count = 0
 
     while flag:
-        cg_start_time_2 = time.time()
+        cg_start_time_2 = datetime.datetime.now()
 
         if left >= len(queue):
             print(' ##### Column generation algorithm fails! #####')
@@ -94,14 +92,14 @@ def cnet_mcf(mcf_input: MCFInput,
         T_1 = list(set(T_1).union(set(queue[left:right])))
         T_1.sort()
 
-        t_2 = t_2 + time.time() - cg_start_time_2
+        t_2 = t_2 + datetime.datetime.now() - cg_start_time_2
 
         sub_output = sub_solving(MCFInput(A_1, b_1, c_1, l_1, u_1),
                                  Basis(vbasis_1, cbasis_1),
                                  T_1,
                                  solver)
 
-        cg_start_time_3 = time.time()
+        cg_start_time_3 = datetime.datetime.now()
 
         # Update basis
         vbasis_1, sol = -np.ones(n + m, dtype=int), np.zeros(n + m)
@@ -130,7 +128,7 @@ def cnet_mcf(mcf_input: MCFInput,
         k = max(int(COLUMN_GENERATION_RATIO * k), loc[0]) if len(loc) > 0 else int(COLUMN_GENERATION_RATIO * k)
         left = right
 
-        t_3 = time.time() - cg_start_time_3 + sub_output.runtime
+        t_3 = datetime.datetime.now() - cg_start_time_3 + sub_output.runtime
         iter_count += sub_output.iter_count
 
     runtime = sort_time + t_1 + t_2 + t_3
@@ -145,6 +143,7 @@ def sub_solving(mcf_input: MCFInput,
                 basis: Basis,
                 T: list,
                 solver: str) -> Output:
+    start = datetime.datetime.now()
     A_sub = mcf_input.A[:, T]
     c_sub = mcf_input.c[T]
     l_sub = mcf_input.l[T]
@@ -161,25 +160,25 @@ def sub_solving(mcf_input: MCFInput,
     xx = sp.linalg.spsolve(BB[basis.cbasis == -1, :], bb[basis.cbasis == -1])
     assert np.count_nonzero(xx < 0) + np.count_nonzero(xx > u_sub[bas_sub == 0]) == 0, "The given basis is not feasible."
 
-    sub_runner = generate_runner(solver)
+    sub_runner = generate_caller(solver)
     sub_runner.read_mcf_input(mcf_input_sub)
     sub_runner.add_warm_start_basis(Basis(bas_sub, basis.cbasis))
-    sub_runner.turn_off_presolve()
-    sub_runner.run_network_simplex()
+    # sub_runner.turn_off_presolve()
+    sub_runner.run_simplex()
     return (Output(x=sub_runner.return_x(),
                    y=sub_runner.return_y(),
                    obj_val=sub_runner.return_obj_val(),
-                   runtime=sub_runner.return_runtime(),
+                   runtime=sub_runner.return_runtime() + datetime.datetime.now() - start,
                    iter_count=sub_runner.return_iter_count(),
                    basis=sub_runner.return_basis(),
                    rcost=sub_runner.return_reduced_cost()))
 
 
-# Debug
-goto_mps_path = get_project_root() / "data/goto"
-model = gurobipy.read("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/netgen_8_14a.mps")
-gur_runner = GrbRunner(tolerance=1e-2)
-gur_runner.read_model(model)
-x = np.load("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/x_netgen.npy")
-mcf_input = gur_runner.return_MCF_model()
-cnet_mcf(mcf_input, x, "GRB")
+# # Debug
+# goto_mps_path = get_project_root() / "data/goto"
+# model = gurobipy.read("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/netgen_8_14a.mps")
+# gur_runner = GrbRunner(tolerance=1e-2)
+# gur_runner.read_model(model)
+# x = np.load("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/x_netgen.npy")
+# mcf_input = gur_runner.return_MCF_model()
+# cnet_mcf(mcf_input, x, "GRB")

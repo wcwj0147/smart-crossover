@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 from typing import Optional
 
@@ -21,7 +22,7 @@ class Output:
     x: Optional[np.ndarray[float]] = None
     y: Optional[np.ndarray[float]] = None
     obj_val: Optional[float] = None
-    runtime: Optional[float] = None
+    runtime: Optional[datetime.timedelta] = None
     iter_count: Optional[float] = None
     rcost: Optional[np.ndarray[float]] = None
     basis: Optional[Basis] = None
