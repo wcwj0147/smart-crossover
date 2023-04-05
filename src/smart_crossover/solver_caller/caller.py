@@ -1,14 +1,23 @@
 """Module to call solvers to run barrier/simplex algorithms on LP problems."""
 import datetime
 from dataclasses import dataclass
-from typing import Union
+from typing import Union, Tuple
 
 import gurobipy
 import numpy as np
 
-from smart_crossover.input import MCFInput
+from smart_crossover.formats import MinCostFlow, OptTrans, StandardLP
 from smart_crossover.output import Basis, Output
-from smart_crossover.solver_caller.gurobi import GrbCaller
+
+
+@dataclass
+class SolverSettings:
+    presolve: int = 0
+    barrierTol: float = 1e-8
+    optimalityTol: float = 1e-6
+    time_limit: int = 600
+    log_file: str = ""
+    log_console: int = 1
 
 
 class SolverCaller:
@@ -16,30 +25,43 @@ class SolverCaller:
     solver_name: str
     model: Union[gurobipy.Model]
 
-    def read_model_from_path(self, path: str) -> None:
-        """Read an LP model from .mps file in the given path."""
+    def read_model_from_file(self, path: str) -> None:
+        """Read a model from .mps/.lp file in the given file path."""
         ...
 
     def read_model(self, model: Union[gurobipy.Model]) -> None:
         ...
 
-    def read_mcf_input(self, mcf_input: MCFInput) -> None:
+    def read_mcf(self, mcf: MinCostFlow) -> None:
+        ...
+
+    def read_ot(self, ot: OptTrans) -> None:
+        ...
+
+    def read_lp(self, lp: StandardLP) -> None:
         ...
 
     def add_warm_start_basis(self,
                              basis: Basis) -> None:
         ...
 
+    def add_warm_start_solution(self,
+                                start_solution: Tuple[np.ndarray[np.float64], np.ndarray[np.float64]]):
+        ...
+
     def return_basis(self) -> Basis:
         ...
 
-    def return_MCF_model(self) -> MCFInput:
+    def return_MCF_model(self) -> MinCostFlow:
         ...
 
     def return_x(self) -> np.ndarray:
         ...
 
     def return_y(self) -> np.ndarray:
+        ...
+
+    def return_barx(self) -> np.ndarray:
         ...
 
     def return_obj_val(self) -> float:
@@ -51,17 +73,21 @@ class SolverCaller:
     def return_iter_count(self) -> float:
         ...
 
+    def return_bar_iter_count(self) -> int:
+        ...
+
     def return_reduced_cost(self) -> np.ndarray:
         ...
 
     def return_output(self) -> Output:
         return Output(x=self.return_x(),
                       y=self.return_y(),
+                      x_bar=self.return_barx(),
                       obj_val=self.return_obj_val(),
                       runtime=self.return_runtime(),
                       iter_count=self.return_iter_count(),
-                      rcost=self.return_reduced_cost(),
-                      basis=self.return_basis())
+                      basis=self.return_basis()
+                      )
 
     def turn_off_presolve(self) -> None:
         ...
@@ -88,21 +114,5 @@ class SolverCaller:
         """Run the solver with the current settings."""
         ...
 
-
-@dataclass
-class SolverSettings:
-    presolve: int = -1,
-    tolerance: float = 1e-8,
-    time_limit: int = 3600,
-    log_file: str = "",
-    log_console: int = 1
-
-
-def generate_caller(solver: str = "GRB",
-                    solver_settings: SolverSettings = SolverSettings()) -> SolverCaller:
-    if solver == "GRB":
-        runner = GrbCaller(solver_settings)
-    else:
-        runner = GrbCaller(solver_settings)
-    # only test with Gurobi for now.
-    return runner
+    def get_model_report(self) -> None:
+        ...

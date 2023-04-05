@@ -4,25 +4,26 @@ import gurobipy
 import numpy as np
 import scipy.sparse as sp
 
-from smart_crossover.input import MCFInput
+from smart_crossover import get_project_root
+from smart_crossover.formats import MinCostFlow
 from smart_crossover.output import Output, Basis
-from smart_crossover.solver_caller.caller import generate_caller
+from smart_crossover.solver_caller.caller import SolverSettings
+from smart_crossover.solver_caller.gurobi import GrbCaller
+from smart_crossover.solver_caller.utils import generate_solver_caller
 
 
-def cnet_mcf(mcf_input: MCFInput,
+def cnet_mcf(mcf: MinCostFlow,
              x: np.ndarray,
              solver: str = "GRB") -> Output:
     sort_start_time = datetime.datetime.now()
 
     # preparation
-    A = mcf_input.A
-    b = mcf_input.b
-    c = mcf_input.c
-    l = mcf_input.l
-    u = mcf_input.u
+    A = mcf.A
+    b = mcf.b
+    c = mcf.c
+    u = mcf.u
     m, n = b.size, c.size
     assert np.sum(b) == 0, "Supply is not equal to demand."
-    assert np.all(l == 0), "There exist non-zero lower bounds."
 
     # reverse large flow
     mask_large_x = x > u / 2
@@ -78,8 +79,8 @@ def cnet_mcf(mcf_input: MCFInput,
     k = int(1.2 * m)
     flag = True
 
-    t_1 = cg_start_time_1 - datetime.datetime.now()
-    t_2, t_3 = 0, 0
+    t_1 = datetime.datetime.now() - cg_start_time_1
+    t_2, t_3 = datetime.timedelta(seconds=0), datetime.timedelta(seconds=0)
     iter_count = 0
 
     while flag:
@@ -92,9 +93,9 @@ def cnet_mcf(mcf_input: MCFInput,
         T_1 = list(set(T_1).union(set(queue[left:right])))
         T_1.sort()
 
-        t_2 = t_2 + datetime.datetime.now() - cg_start_time_2
+        t_2 = t_2 + (datetime.datetime.now() - cg_start_time_2)
 
-        sub_output = sub_solving(MCFInput(A_1, b_1, c_1, l_1, u_1),
+        sub_output = sub_solving(MinCostFlow(A_1, b_1, c_1, l_1, u_1),
                                  Basis(vbasis_1, cbasis_1),
                                  T_1,
                                  solver)
@@ -111,13 +112,6 @@ def cnet_mcf(mcf_input: MCFInput,
         # Calculate reduced cost from dual solution
         r = c_1 - A_1.T @ sub_output.y
 
-        # # Use vbasis, cbasis to calculate r:
-        # A_fullrowrank = A_1[cbasis_1 == -1, :]
-        # B = A_fullrowrank[:, vbasis_1 == 0]
-        # c_B = c_1[vbasis_1 == 0]
-        # p = sp.linalg.spsolve(B, c_B)
-        # r = c_1 - A_fullrowrank.T @ p
-
         # Check stop criterion
         if (np.max(np.abs(sol[n:n+m])) < 1e-8) and (
                 np.min(np.concatenate((r[vbasis_1 == -1], -r[vbasis_1 == -2]))) > -1e-6):
@@ -128,7 +122,7 @@ def cnet_mcf(mcf_input: MCFInput,
         k = max(int(COLUMN_GENERATION_RATIO * k), loc[0]) if len(loc) > 0 else int(COLUMN_GENERATION_RATIO * k)
         left = right
 
-        t_3 = datetime.datetime.now() - cg_start_time_3 + sub_output.runtime
+        t_3 = (datetime.datetime.now() - cg_start_time_3) + sub_output.runtime
         iter_count += sub_output.iter_count
 
     runtime = sort_time + t_1 + t_2 + t_3
@@ -139,20 +133,20 @@ def cnet_mcf(mcf_input: MCFInput,
     return Output(x=x_1, obj_val=obj_val_1, runtime=runtime, iter_count=iter_count, basis=basis)
 
 
-def sub_solving(mcf_input: MCFInput,
+def sub_solving(mcf: MinCostFlow,
                 basis: Basis,
                 T: list,
                 solver: str) -> Output:
     start = datetime.datetime.now()
-    A_sub = mcf_input.A[:, T]
-    c_sub = mcf_input.c[T]
-    l_sub = mcf_input.l[T]
-    u_sub = mcf_input.u[T]
+    A_sub = mcf.A[:, T]
+    c_sub = mcf.c[T]
+    l_sub = mcf.l[T]
+    u_sub = mcf.u[T]
     bas_sub = basis.vbasis[T]
     indup = np.where(basis.vbasis == -2)[0]
     indup_rest = list(set(indup).difference(set(T)))
-    b_sub = mcf_input.b - mcf_input.A[:, indup_rest] @ mcf_input.u[indup_rest]
-    mcf_input_sub = MCFInput(A_sub, b_sub, c_sub, l_sub, u_sub)
+    b_sub = mcf.b - mcf.A[:, indup_rest] @ mcf.u[indup_rest]
+    mcf_input_sub = MinCostFlow(A_sub, b_sub, c_sub, l_sub, u_sub)
 
     # Check whether basis is a feasible starting basis
     BB = A_sub[:, bas_sub == 0]
@@ -160,25 +154,25 @@ def sub_solving(mcf_input: MCFInput,
     xx = sp.linalg.spsolve(BB[basis.cbasis == -1, :], bb[basis.cbasis == -1])
     assert np.count_nonzero(xx < 0) + np.count_nonzero(xx > u_sub[bas_sub == 0]) == 0, "The given basis is not feasible."
 
-    sub_runner = generate_caller(solver)
-    sub_runner.read_mcf_input(mcf_input_sub)
-    sub_runner.add_warm_start_basis(Basis(bas_sub, basis.cbasis))
-    # sub_runner.turn_off_presolve()
-    sub_runner.run_simplex()
-    return (Output(x=sub_runner.return_x(),
-                   y=sub_runner.return_y(),
-                   obj_val=sub_runner.return_obj_val(),
-                   runtime=sub_runner.return_runtime() + datetime.datetime.now() - start,
-                   iter_count=sub_runner.return_iter_count(),
-                   basis=sub_runner.return_basis(),
-                   rcost=sub_runner.return_reduced_cost()))
+    sub_caller = generate_solver_caller(solver)
+    sub_caller.read_mcf(mcf_input_sub)
+    sub_caller.add_warm_start_basis(Basis(bas_sub, basis.cbasis))
+    end = datetime.datetime.now()
+    sub_caller.run_simplex()
+    return (Output(x=sub_caller.return_x(),
+                   y=sub_caller.return_y(),
+                   obj_val=sub_caller.return_obj_val(),
+                   runtime=sub_caller.return_runtime() + (end - start),
+                   iter_count=sub_caller.return_iter_count(),
+                   basis=sub_caller.return_basis(),
+                   rcost=sub_caller.return_reduced_cost()))
 
 
-# # Debug
-# goto_mps_path = get_project_root() / "data/goto"
-# model = gurobipy.read("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/netgen_8_14a.mps")
-# gur_runner = GrbRunner(tolerance=1e-2)
-# gur_runner.read_model(model)
-# x = np.load("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/x_netgen.npy")
-# mcf_input = gur_runner.return_MCF_model()
-# cnet_mcf(mcf_input, x, "GRB")
+# Debug
+goto_mps_path = get_project_root() / "data/goto"
+model = gurobipy.read("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/netgen_8_14a.mps")
+gur_runner = GrbCaller(SolverSettings())
+gur_runner.read_model(model)
+x = np.load("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/x_netgen.npy")
+mcf_input = gur_runner.return_MCF_model()
+cnet_mcf(mcf_input, x, "GRB")
