@@ -161,8 +161,11 @@ class GrbCaller(SolverCaller):
     def reset_model(self) -> None:
         self.model.reset()
 
-    def return_MCF_model(self) -> MinCostFlow:
-        return MinCostFlow(self.get_A(), self.get_b(), self.get_c(), self.get_l(), self.get_u())
+    def return_MCF(self) -> MinCostFlow:
+        return MinCostFlow(self.get_A(), self.get_b(), self.get_c(), self.get_u())
+
+    def return_LP(self) -> StandardLP:
+        return StandardLP(self.get_A(), self.get_b(), self.get_c(), self.get_u())
 
     def return_x(self) -> np.ndarray:
         assert self.model.Status == GRB.OPTIMAL, "The model is not solved to optimal!"

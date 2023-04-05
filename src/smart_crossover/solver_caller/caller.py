@@ -52,7 +52,10 @@ class SolverCaller:
     def return_basis(self) -> Basis:
         ...
 
-    def return_MCF_model(self) -> MinCostFlow:
+    def return_MCF(self) -> MinCostFlow:
+        ...
+
+    def return_lp(self) -> StandardLP:
         ...
 
     def return_x(self) -> np.ndarray:

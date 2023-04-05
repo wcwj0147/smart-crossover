@@ -174,5 +174,5 @@ model = gurobipy.read("/Users/jian/Documents/2023 Spring/smart-crossover/data/go
 gur_runner = GrbCaller(SolverSettings())
 gur_runner.read_model(model)
 x = np.load("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/x_netgen.npy")
-mcf_input = gur_runner.return_MCF_model()
+mcf_input = gur_runner.return_MCF()
 cnet_mcf(mcf_input, x, "GRB")

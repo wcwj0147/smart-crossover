@@ -2,6 +2,7 @@ import numpy as np
 
 from smart_crossover.formats import StandardLP, SubLPManager
 from smart_crossover.output import Output
+from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.utils import solve_lp_barrier, solve_lp
 
 
@@ -58,12 +59,14 @@ def get_perturb_problem(lp: StandardLP,
 
 
 def run_perturb_algorithm(lp: StandardLP,
-                          solver: str = "GRB") -> Output:
+                          solver: str = "GRB",
+                          solver_settings: SolverSettings = SolverSettings()) -> Output:
     """
 
     Args:
         lp:
         solver:
+        solver_settings:
 
     Returns:
 
