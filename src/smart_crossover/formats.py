@@ -37,6 +37,15 @@ class MinCostFlow(StandardLP):
                    0 <= x <= u
     """
 
+    def __init__(self,
+                 A: Union[scipy.sparse.csr_matrix, np.ndarray],
+                 b: np.ndarray,
+                 c: np.ndarray,
+                 u: np.ndarray) -> None:
+        if np.sum(b) != 0:
+            raise ValueError("The sum of the b array must be equal to 0.")
+        super().__init__(A, b, c, u)
+
 
 class OptTrans:
     pass
