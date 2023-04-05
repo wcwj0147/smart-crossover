@@ -36,8 +36,8 @@
 ehthumbs.db
 Thumbs.db
 
-# Don't know what
-#################
+# Don't know what #
+###################
 __pycache__/
 .idea/
 
