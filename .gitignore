@@ -36,3 +36,9 @@
 ehthumbs.db
 Thumbs.db
 
+# For this project #
+old_crossover_1/
+old_crossover_2/
+IJOC_Smart_Crossover.pdf
+refman.pdf
+src/smart_crossover/__pycache__
