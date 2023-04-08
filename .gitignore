@@ -38,7 +38,7 @@ Thumbs.db
 
 # Don't know what #
 ###################
-**/__pycache__/
+__pycache__/
 *.pyc
 *.pyo
 .idea/
