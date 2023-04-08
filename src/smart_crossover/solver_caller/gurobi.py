@@ -12,46 +12,6 @@ from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
 
-def get_standard_form_model(model: gurobipy.Model) -> gurobipy.Model:
-    std_form_model = model.copy()
-    for var in model.getVars():
-        col = model.getCol(var)
-        minus_col = gurobipy.Column()
-        for i in range(col.size()):
-            minus_col.addTerms(-col.getCoeff(i), col.getConstr(i))
-        if var.LB == - inf and var.UB == inf:
-            std_form_model.addVar(obj=var.Obj, name=var.VarName+"+", column=col)
-            std_form_model.addVar(obj=-var.Obj, name=var.VarName+"-", column=minus_col)
-        elif var.LB == -inf and var.UB != inf:
-            new_var = std_form_model.addVar(lb=0, ub=inf, obj=-var.Obj, name=var.VarName+'~', column=minus_col)
-            std_form_model.update()
-            new_col = std_form_model.getCol(new_var)
-            for i in range(col.size()):
-                new_col.getConstr(i).RHS += - var.UB
-        else:
-            if var.LB != -inf and var.LB != 0 and var.UB == inf:
-                new_var = std_form_model.addVar(obj=var.Obj, name=var.VarName+'~', column=col)
-            else:
-                new_var = std_form_model.addVar(ub=var.UB - var.LB, obj=var.Obj, name=var.VarName+'~', column=col)
-            std_form_model.update()
-            new_col = std_form_model.getCol(new_var)
-            for i in range(col.size()):
-                new_col.getConstr(i).RHS += var.LB
-        std_form_model.remove(std_form_model.getVarByName(var.VarName))
-        std_form_model.update()
-    for constr in model.getConstrs():
-        lhs = model.getRow(constr)
-        if constr.Sense != '=':
-            slack_var = std_form_model.addVar(name=f"slack_{constr.ConstrName}")
-            if constr.Sense == '<':
-                std_form_model.addConstr(lhs + slack_var == constr.RHS, name=f"equality_{constr.ConstrName}")
-            elif constr.Sense == '>':
-                std_form_model.addConstr(lhs - slack_var == constr.RHS, name=f"equality_{constr.ConstrName}")
-            std_form_model.remove(std_form_model.getConstrByName(constr.ConstrName))
-            std_form_model.update()
-    return std_form_model
-
-
 class GrbCaller(SolverCaller):
     model: gurobipy.Model
     """Gurobi runner."""
