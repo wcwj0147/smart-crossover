@@ -29,6 +29,42 @@ class StandardLP:
         self.u = u
 
 
+class GeneralLP:
+    """
+    Information of a standard form LP model:
+             min      c^T x
+             s.t.     A x = / > / < b
+                      l <= x <= u
+    """
+    A: Union[scipy.sparse.csr_matrix, np.ndarray]
+    b: np.ndarray
+    sense: np.ndarray[str]
+    c: np.ndarray
+    l: np.ndarray
+    u: np.ndarray
+
+    def __init__(self,
+                 A: Union[scipy.sparse.csr_matrix, np.ndarray],
+                 b: np.ndarray,
+                 sense: np.ndarray[str],
+                 c: np.ndarray,
+                 l: np.ndarray,
+                 u: np.ndarray) -> None:
+        self.A = A
+        self.b = b
+        self.sense = sense
+        self.c = c
+        self.l = l
+        self.u = u
+
+    def to_standard_form(self) -> StandardLP:
+        A_std = self.A
+        b_std = self.b
+        c_std = self.c
+        u_std = self.u
+        return StandardLP(A_std, b_std, c_std, u_std)
+
+
 class MinCostFlow(StandardLP):
     """
     Information of the LP model for a general MCF problem:
@@ -54,6 +90,7 @@ class OptTrans:
 class SubLPManager:
     """
     Information of a sub LP problem:
+
     """
 
     lp: StandardLP
@@ -67,11 +104,15 @@ class SubLPManager:
         self.ind_fix_to_up = ind_fix_to_up
         self.ind_fix = list(set(ind_fix_to_up).union(set(ind_fix_to_low)))
         self.ind_free = np.array(list(set(range(len(lp.c))) - set(self.ind_fix)))
+        self.lp_sub = None
+        self.update_sublp()
+
+    def update_sublp(self) -> None:
         self.lp_sub = StandardLP(
-            A=lp.A[:, self.ind_free],
-            b=lp.b - lp.A[:, ind_fix_to_up] @ lp.u[ind_fix_to_up],
-            c=lp.c[self.ind_free],
-            u=lp.u[self.ind_free]
+            A=self.lp.A[:, self.ind_free],
+            b=self.lp.b - self.lp.A[:, self.ind_fix_to_up] @ self.lp.u[self.ind_fix_to_up],
+            c=self.lp.c[self.ind_free],
+            u=self.lp.u[self.ind_free]
         )
 
     def recover_x(self, x_sub: np.ndarray) -> np.ndarray:

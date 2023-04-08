@@ -10,6 +10,7 @@ from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 from smart_crossover.solver_caller.utils import generate_solver_caller
 
 
+# Todo: separate into NetworkExperimentRunner & LPExperimentRunner.
 class ExperimentRunner:
     models: list[Union[gurobipy.Model]]
     solver: str

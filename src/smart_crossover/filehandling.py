@@ -61,8 +61,9 @@ class FileHandler:
     def write_standard_forms(self, path: str = str(get_project_root() / "data/lp/standard")) -> None:
         """ Get standard forms of saved models and write them to the given path."""
         for model in self.models:
-            standard_form = get_standard_form_model(model)
-            standard_form.write(path + f"/{model.ModelName}.mps")
+            self.grbCaller.read_model(model)
+            self.grbCaller.read_lp(self.grbCaller.return_GenLP().to_standard_form())
+            self.grbCaller.model.write(path + f"/{model.ModelName}.mps")
 
     def get_models_report(self) -> str:
         """ Get a report string of models. """

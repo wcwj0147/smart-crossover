@@ -7,7 +7,7 @@ from gurobipy import GRB
 import numpy as np
 import scipy
 
-from smart_crossover.formats import MinCostFlow, StandardLP
+from smart_crossover.formats import MinCostFlow, StandardLP, GeneralLP
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
@@ -23,19 +23,22 @@ def get_standard_form_model(model: gurobipy.Model) -> gurobipy.Model:
             std_form_model.addVar(obj=var.Obj, name=var.VarName+"+", column=col)
             std_form_model.addVar(obj=-var.Obj, name=var.VarName+"-", column=minus_col)
         elif var.LB == -inf and var.UB != inf:
-            new_var = std_form_model.addVar(lb=0, ub=inf, obj=-var.Obj, name=var.VarName, column=minus_col)
+            new_var = std_form_model.addVar(lb=0, ub=inf, obj=-var.Obj, name=var.VarName+'~', column=minus_col)
+            std_form_model.update()
             new_col = std_form_model.getCol(new_var)
             for i in range(col.size()):
                 new_col.getConstr(i).RHS += - var.UB
         else:
             if var.LB != -inf and var.LB != 0 and var.UB == inf:
-                new_var = std_form_model.addVar(obj=var.Obj, name=var.VarName, column=col)
+                new_var = std_form_model.addVar(obj=var.Obj, name=var.VarName+'~', column=col)
             else:
-                new_var = std_form_model.addVar(ub=var.UB - var.LB, obj=var.Obj, name=var.VarName, column=col)
+                new_var = std_form_model.addVar(ub=var.UB - var.LB, obj=var.Obj, name=var.VarName+'~', column=col)
+            std_form_model.update()
             new_col = std_form_model.getCol(new_var)
             for i in range(col.size()):
                 new_col.getConstr(i).RHS += var.LB
-        std_form_model.remove(var)
+        std_form_model.remove(std_form_model.getVarByName(var.VarName))
+        std_form_model.update()
     for constr in model.getConstrs():
         lhs = model.getRow(constr)
         if constr.Sense != '=':
@@ -44,7 +47,8 @@ def get_standard_form_model(model: gurobipy.Model) -> gurobipy.Model:
                 std_form_model.addConstr(lhs + slack_var == constr.RHS, name=f"equality_{constr.ConstrName}")
             elif constr.Sense == '>':
                 std_form_model.addConstr(lhs - slack_var == constr.RHS, name=f"equality_{constr.ConstrName}")
-            std_form_model.remove(constr)
+            std_form_model.remove(std_form_model.getConstrByName(constr.ConstrName))
+            std_form_model.update()
     return std_form_model
 
 
@@ -85,6 +89,9 @@ class GrbCaller(SolverCaller):
 
     def get_b(self) -> np.ndarray:
         return np.array(self.model.getAttr("RHS", self.model.getConstrs()))
+
+    def get_sense(self) -> np.ndarray:
+        return np.array(self.model.getAttr("Sense", self.model.getConstrs()))
 
     def get_c(self) -> np.ndarray:
         return np.array(self.model.getAttr("obj", self.model.getVars()))
@@ -164,8 +171,11 @@ class GrbCaller(SolverCaller):
     def return_MCF(self) -> MinCostFlow:
         return MinCostFlow(self.get_A(), self.get_b(), self.get_c(), self.get_u())
 
-    def return_LP(self) -> StandardLP:
+    def return_StdLP(self) -> StandardLP:
         return StandardLP(self.get_A(), self.get_b(), self.get_c(), self.get_u())
+
+    def return_GenLP(self) -> GeneralLP:
+        return GeneralLP(self.get_A(), self.get_b(), self.get_sense(), self.get_c(), self.get_l(), self.get_u())
 
     def return_x(self) -> np.ndarray:
         assert self.model.Status == GRB.OPTIMAL, "The model is not solved to optimal!"

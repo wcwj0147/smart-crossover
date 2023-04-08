@@ -1,5 +1,6 @@
 """Module to call solvers to run barrier/simplex algorithms on LP problems."""
 import datetime
+from abc import ABC
 from dataclasses import dataclass
 from typing import Union, Tuple
 
@@ -20,7 +21,7 @@ class SolverSettings:
     log_console: int = 1
 
 
-class SolverCaller:
+class SolverCaller(ABC):
     """Class to call optimization solver on LP problems."""
     solver_name: str
     model: Union[gurobipy.Model]

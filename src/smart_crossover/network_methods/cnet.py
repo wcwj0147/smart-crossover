@@ -12,6 +12,7 @@ from smart_crossover.solver_caller.gurobi import GrbCaller
 from smart_crossover.solver_caller.utils import generate_solver_caller
 
 
+# Todo: Clean this algorithm using new methods.
 def cnet_mcf(mcf: MinCostFlow,
              x: np.ndarray,
              solver: str = "GRB") -> Output:
@@ -23,11 +24,10 @@ def cnet_mcf(mcf: MinCostFlow,
     c = mcf.c
     u = mcf.u
     m, n = b.size, c.size
-    assert np.sum(b) == 0, "Supply is not equal to demand."
 
     # reverse large flow
     mask_large_x = x > u / 2
-    large_x_ind = np.where(mask_large_x)[0]
+    ind_fix_to_up = np.where(mask_large_x)[0]
     x_hat = x * (~mask_large_x) + u * mask_large_x - x * mask_large_x
     x_hat[(x < 0) | (x > u)] = 0
     A_bar = A.multiply(~mask_large_x) - A.multiply(mask_large_x)
@@ -64,14 +64,13 @@ def cnet_mcf(mcf: MinCostFlow,
     b_sign = np.sign(b_true)
     b_sign[b_sign == 0] = 1
     c_1 = np.concatenate([c, K * np.ones(m)])
-    l_1 = np.concatenate([l, np.zeros(m)])
     u_1 = np.concatenate([u, np.Inf * np.ones(m)])
     A_1 = sp.hstack((A, sp.diags(b_sign)))
     A_1 = sp.vstack((A_1, sp.csr_matrix(np.concatenate([np.zeros(n), -b_sign]))))
     A_1 = A_1.tocsr()
     b_1 = np.concatenate([b, np.array([0])])
     vbasis_1 = np.concatenate((-np.ones(n), np.zeros(m)))
-    vbasis_1[large_x_ind] = -2
+    vbasis_1[ind_fix_to_up] = -2
     cbasis_1 = np.concatenate([-np.ones(m), np.zeros(1)])
     T_1 = np.where(vbasis_1 == 0)[0]
 
@@ -95,7 +94,7 @@ def cnet_mcf(mcf: MinCostFlow,
 
         t_2 = t_2 + (datetime.datetime.now() - cg_start_time_2)
 
-        sub_output = sub_solving(MinCostFlow(A_1, b_1, c_1, l_1, u_1),
+        sub_output = sub_solving(MinCostFlow(A_1, b_1, c_1, u_1),
                                  Basis(vbasis_1, cbasis_1),
                                  T_1,
                                  solver)
@@ -105,7 +104,7 @@ def cnet_mcf(mcf: MinCostFlow,
         # Update basis
         vbasis_1, sol = -np.ones(n + m, dtype=int), np.zeros(n + m)
         vbasis_1[T_1], sol[T_1] = sub_output.basis.vbasis, sub_output.x
-        vbasis_1[list(set(large_x_ind).difference(set(T_1)))] = -2
+        vbasis_1[list(set(ind_fix_to_up).difference(set(T_1)))] = -2
         cbasis_1 = sub_output.basis.cbasis
         sol[vbasis_1 == -2] = u_1[vbasis_1 == -2]
 

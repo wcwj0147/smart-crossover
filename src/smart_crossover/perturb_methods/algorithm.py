@@ -60,13 +60,13 @@ def get_perturb_problem(lp: StandardLP,
 
 def run_perturb_algorithm(lp: StandardLP,
                           solver: str = "GRB",
-                          solver_settings: SolverSettings = SolverSettings()) -> Output:
+                          settings: SolverSettings = SolverSettings()) -> Output:
     """
 
     Args:
         lp:
         solver:
-        solver_settings:
+        settings:
 
     Returns:
 
@@ -77,8 +77,9 @@ def run_perturb_algorithm(lp: StandardLP,
         return lp.c - lp.A.transpose() @ barrier_output.y
 
     perturbLP_manager = get_perturb_problem(lp, barrier_output.x, get_dual_slack())
-    perturb_barrier_output = solve_lp_barrier(perturbLP_manager.lp_sub, solver)
+    perturb_barrier_output = solve_lp_barrier(perturbLP_manager.lp_sub, solver, settings.barrierTol)
     final_output = solve_lp(lp, solver,
+                            optimalityTol=settings.optimalityTol,
                             warm_start_solution=(perturbLP_manager.recover_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y))
     return Output(x=final_output.x,
