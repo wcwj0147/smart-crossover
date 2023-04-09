@@ -29,42 +29,6 @@ class StandardLP:
         self.u = u
 
 
-class GeneralLP:
-    """
-    Information of a standard form LP model:
-             min      c^T x
-             s.t.     A x = / > / < b
-                      l <= x <= u
-    """
-    A: Union[scipy.sparse.csr_matrix, np.ndarray]
-    b: np.ndarray
-    sense: np.ndarray[str]
-    c: np.ndarray
-    l: np.ndarray
-    u: np.ndarray
-
-    def __init__(self,
-                 A: Union[scipy.sparse.csr_matrix, np.ndarray],
-                 b: np.ndarray,
-                 sense: np.ndarray[str],
-                 c: np.ndarray,
-                 l: np.ndarray,
-                 u: np.ndarray) -> None:
-        self.A = A
-        self.b = b
-        self.sense = sense
-        self.c = c
-        self.l = l
-        self.u = u
-
-    def to_standard_form(self) -> StandardLP:
-        A_std = self.A
-        b_std = self.b
-        c_std = self.c
-        u_std = self.u
-        return StandardLP(A_std, b_std, c_std, u_std)
-
-
 class MinCostFlow(StandardLP):
     """
     Information of the LP model for a general MCF problem:

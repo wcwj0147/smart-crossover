@@ -7,7 +7,7 @@ from gurobipy import GRB
 import numpy as np
 import scipy
 
-from smart_crossover.formats import MinCostFlow, StandardLP, GeneralLP
+from smart_crossover.formats import MinCostFlow, StandardLP
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
@@ -133,9 +133,6 @@ class GrbCaller(SolverCaller):
 
     def return_StdLP(self) -> StandardLP:
         return StandardLP(self.get_A(), self.get_b(), self.get_c(), self.get_u())
-
-    def return_GenLP(self) -> GeneralLP:
-        return GeneralLP(self.get_A(), self.get_b(), self.get_sense(), self.get_c(), self.get_l(), self.get_u())
 
     def return_x(self) -> np.ndarray:
         assert self.model.Status == GRB.OPTIMAL, "The model is not solved to optimal!"
