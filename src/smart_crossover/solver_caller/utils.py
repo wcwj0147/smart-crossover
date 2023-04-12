@@ -20,8 +20,9 @@ def generate_solver_caller(solver: str = "GRB",
 
 def solve_lp_barrier(lp: StandardLP,
                      solver: str = "GRB",
-                     barrierTol: float = 1e-8) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(barrierTol=barrierTol))
+                     barrierTol: float = 1e-8,
+                     optimalityTol: float = 1e-6) -> Output:
+    solver_caller = generate_solver_caller(solver, SolverSettings(barrierTol=barrierTol, optimalityTol=optimalityTol))
     solver_caller.read_lp(lp)
     solver_caller.run_barrier()
     return solver_caller.return_output()
@@ -34,9 +35,9 @@ def solve_lp(lp: StandardLP,
              warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
     solver_caller = generate_solver_caller(solver, SolverSettings(optimalityTol=optimalityTol))
     solver_caller.read_lp(lp)
-    solver_caller.run_simplex()
     if warm_start_solution is not None:
         solver_caller.add_warm_start_solution(warm_start_solution)
     if warm_start_basis is not None:
         solver_caller.add_warm_start_basis(warm_start_basis)
+    solver_caller.run_simplex()
     return solver_caller.return_output()

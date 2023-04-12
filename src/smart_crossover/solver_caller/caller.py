@@ -16,7 +16,7 @@ class SolverSettings:
     presolve: int = 0
     barrierTol: float = 1e-8
     optimalityTol: float = 1e-6
-    time_limit: int = 600
+    timeLimit: int = 600
     log_file: str = ""
     log_console: int = 1
 
@@ -56,7 +56,7 @@ class SolverCaller(ABC):
     def return_MCF(self) -> MinCostFlow:
         ...
 
-    def return_lp(self) -> StandardLP:
+    def return_StdLP(self) -> StandardLP:
         ...
 
     def return_x(self) -> np.ndarray:

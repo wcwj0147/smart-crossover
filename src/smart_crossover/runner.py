@@ -59,9 +59,6 @@ class ExperimentRunner:
                 )
             )
 
-    def get_crossover_results(self) -> None:
-        pass
-
     def run_ot_crossover(self) -> None:
         for model in self.models:
             self.solver_caller.read_model(model)
@@ -74,11 +71,19 @@ class ExperimentRunner:
                 tnet_ot()
             )
 
-    def run_lp_crossover(self) -> None:
+    def run_lp_crossover(self, model_name: str = '') -> None:
         for model in self.models:
+            if model_name != '' and model.ModelName != model_name:
+                continue
             self.solver_caller.read_model(model)
-            self.solver_caller.run_barrier_no_crossover()
-            self.results['barrier_noCrossover'].append(self.solver_caller.return_output())
             self.results['perturb_barrier'].append(
-                run_perturb_algorithm(self.solver_caller.return_lp(), self.solver, self.solver_settings)
+                run_perturb_algorithm(self.solver_caller.return_StdLP(), self.solver, self.solver_settings)
             )
+
+    def run_lp_barrier(self, model_name: str = '') -> None:
+        for model in self.models:
+            if model_name != '' and model.ModelName != model_name:
+                continue
+            self.solver_caller.read_model(model)
+            self.solver_caller.run_barrier()
+            self.results['barrier'].append((self.solver_caller.return_output()))

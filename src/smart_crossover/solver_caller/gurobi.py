@@ -172,4 +172,4 @@ class GrbCaller(SolverCaller):
         self.model.setParam("LogToConsole", self.settings.log_console)
 
     def _set_time_limit(self) -> None:
-        self.model.setParam("TimeLimit", self.settings.time_limit)
+        self.model.setParam("TimeLimit", self.settings.timeLimit)
