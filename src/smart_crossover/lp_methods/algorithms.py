@@ -1,7 +1,7 @@
 import numpy as np
 
 from smart_crossover.formats import StandardLP
-from smart_crossover.lp_manager import LPManager
+from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Output
 from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.gurobi import GrbCaller

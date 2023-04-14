@@ -3,9 +3,9 @@ from typing import Union, Optional
 
 import gurobipy
 
-from smart_crossover.network_methods.cnet import cnet_mcf
+from smart_crossover.network_methods.backlog import cnet
 from smart_crossover.output import Output
-from smart_crossover.perturb_methods.algorithm import run_perturb_algorithm
+from smart_crossover.lp_methods.algorithms import run_perturb_algorithm
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 from smart_crossover.solver_caller.utils import generate_solver_caller
 
@@ -52,7 +52,7 @@ class ExperimentRunner:
             self.solver_caller.run_barrier_no_crossover()
             self.results['barrier_noCrossover'].append(self.solver_caller.return_output())
             self.results['cnet'].append(
-                cnet_mcf(
+                cnet(
                     self.solver_caller.return_MCF(),
                     self.solver_caller.return_x(),
                     self.solver

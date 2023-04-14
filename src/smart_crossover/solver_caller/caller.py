@@ -7,7 +7,7 @@ from typing import Union, Tuple
 import gurobipy
 import numpy as np
 
-from smart_crossover.formats import MinCostFlow, OptTrans, StandardLP
+from smart_crossover.formats import MinCostFlow, OptTransport, StandardLP
 from smart_crossover.output import Basis, Output
 
 
@@ -36,7 +36,7 @@ class SolverCaller(ABC):
     def read_mcf(self, mcf: MinCostFlow) -> None:
         ...
 
-    def read_ot(self, ot: OptTrans) -> None:
+    def read_ot(self, ot: OptTransport) -> None:
         ...
 
     def read_lp(self, lp: StandardLP) -> None:
