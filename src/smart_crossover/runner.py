@@ -7,7 +7,7 @@ from smart_crossover.network_methods.backlog import cnet
 from smart_crossover.output import Output
 from smart_crossover.lp_methods.algorithms import run_perturb_algorithm
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
-from smart_crossover.solver_caller.utils import generate_solver_caller
+from smart_crossover.solver_caller.solving import generate_solver_caller
 
 
 # Todo: separate into NetworkExperimentRunner & LPExperimentRunner.

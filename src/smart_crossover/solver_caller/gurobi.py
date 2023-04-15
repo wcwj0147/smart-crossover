@@ -7,7 +7,7 @@ from gurobipy import GRB
 import numpy as np
 import scipy
 
-from smart_crossover.formats import MinCostFlow, StandardLP
+from smart_crossover.formats import MinCostFlow, StandardLP, OptTransport
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
@@ -35,6 +35,9 @@ class GrbCaller(SolverCaller):
         model.addMConstr(mcf.A, x, '=', mcf.b, name='Ax')
         self.model = model
         self.model.update()  # Let MVar, MConstr info to appear in the model
+
+    def read_ot(self, ot: OptTransport) -> None:
+        self.read_mcf(ot.to_MCF())
 
     def read_lp(self, lp: StandardLP) -> None:
         model = gurobipy.Model()
@@ -110,13 +113,13 @@ class GrbCaller(SolverCaller):
         self.model.setParam("Crossover", 0)
         self._set_log()
         self._set_time_limit()
-        self.turn_off_presolve()
         self._run()
 
     def run_simplex(self) -> None:
         self.model.setParam("Method", -1)
         self._set_log()
         self._set_time_limit()
+        self.turn_off_presolve()
         self._run()
 
     def run_network_simplex(self) -> None:
@@ -173,3 +176,6 @@ class GrbCaller(SolverCaller):
 
     def _set_time_limit(self) -> None:
         self.model.setParam("TimeLimit", self.settings.timeLimit)
+
+    def turn_off_presolve(self) -> None:
+        self.model.setParam("Presolve", 0)

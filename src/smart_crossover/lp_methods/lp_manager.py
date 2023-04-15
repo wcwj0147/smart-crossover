@@ -4,7 +4,7 @@ from scipy import sparse as sp
 from smart_crossover.parameters import TOLERANCE_FOR_ARTIFICIAL_VARS, TOLERANCE_FOR_REDUCED_COSTS
 from smart_crossover.formats import StandardLP
 from smart_crossover.output import Basis, Output
-from smart_crossover.solver_caller.utils import solve_lp
+from smart_crossover.solver_caller.solving import solve_lp
 
 
 class LPManager:

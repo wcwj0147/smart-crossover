@@ -1,15 +1,12 @@
 from typing import Optional
 
-import gurobipy
 import numpy as np
 
-from smart_crossover import get_project_root
 from smart_crossover.formats import OptTransport, MinCostFlow
 from smart_crossover.network_methods.net_manager import OTManager, MCFManager, NetworkManager
 from smart_crossover.network_methods.tree_BI import tree_basis_identify
 from smart_crossover.output import Output
 from smart_crossover.parameters import COLUMN_GENERATION_RATIO
-from smart_crossover.solver_caller.gurobi import GrbCaller
 from smart_crossover.timer import Timer
 
 
@@ -38,6 +35,7 @@ def network_crossover(
     # Set the timer.
     timer = Timer()
     timer.start_timer()
+    push_iter = 0   # counts the number of push iterations in TNET.
 
     if method == "tnet" or method == "cnet_ot":
         manager = OTManager(ot)
@@ -50,21 +48,25 @@ def network_crossover(
     queue, flow_indicators = manager.get_sorted_flows(x)
 
     if method == "tnet":
-        manager.set_basis(tree_basis_identify(manager, flow_indicators))
+        tree_basis, push_iter = tree_basis_identify(manager, flow_indicators)
+        manager.set_basis(tree_basis)
+        manager.add_free_variables(tree_basis.vbasis == 0)
     else:  # method in ["cnet_ot", "cnet_mcf"]
         if method == "cnet_ot":
-            manager.extend_by_bigM(manager.n * np.max(ot.M))
+            manager.extend_by_bigM(manager.m * np.max(ot.M))
         elif method == "cnet_mcf":
             manager.rescale_cost(np.max(np.abs(mcf.c)))
             manager.fix_variables(ind_fix_to_up=np.where(x >= mcf.u / 2)[0], ind_fix_to_low=np.where(x < mcf.u / 2)[0])
-            manager.extend_by_bigM(manager.n * np.max(mcf.u))
+            manager.extend_by_bigM(manager.m * np.max(mcf.u))
         manager.update_subproblem()
         manager.set_initial_basis()
 
     timer.end_timer()
     cg_output = column_generation(manager, queue, solver)
 
-    return Output(x=cg_output.x, obj_val=cg_output.obj_val, runtime=timer.total_duration + cg_output.runtime,
+    return Output(x=cg_output.x, obj_val=cg_output.obj_val,
+                  runtime=timer.total_duration + cg_output.runtime,
+                  iter_count=cg_output.iter_count + push_iter,
                   basis=cg_output.basis)
 
 
@@ -76,7 +78,7 @@ def column_generation(net_manager: NetworkManager,
     timer = Timer()
     timer.start_timer()
     left_pointer = 0
-    num_vars_in_next_subproblem = int(1.2 * net_manager.m)
+    num_vars_in_next_subproblem = int(1.5 * net_manager.m)
     is_not_optimal = True
     x = None
     obj_val = None
@@ -114,13 +116,3 @@ def column_generation(net_manager: NetworkManager,
 
     timer.end_timer()
     return Output(x=x, obj_val=obj_val, runtime=timer.total_duration, iter_count=iter_count, basis=net_manager.basis)
-
-
-# Debug
-goto_mps_path = get_project_root() / "data/goto"
-model = gurobipy.read("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/netgen_8_14a.mps")
-gur_runner = GrbCaller()
-gur_runner.read_model(model)
-x = np.load("/Users/jian/Documents/2023 Spring/smart-crossover/data/goto/x_netgen.npy")
-mcf = gur_runner.return_MCF()
-network_crossover(x, mcf=mcf, method="cnet_mcf", solver="GRB")

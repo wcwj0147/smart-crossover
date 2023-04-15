@@ -19,20 +19,24 @@ lp_files = dir(fullfile(lp_data_path, '*.mps'));
 
 f = waitbar(0, 'Starting');
 K = length(lp_files);
-for k = 1:K
+for k = 19:K
     waitbar(k/K, f, sprintf('Progress: %d %%, %s', floor(k/K*100), lp_files(k).name));
     m = gurobi_read(fullfile(lp_data_path, lp_files(k).name));
+    results = gurobi(gurobi_relax(m));
     if isfield(m, 'modelname')
         m_std.modelname = m.modelname;
     end
     assert(~isfield(m, 'modelsense'), "Model is to maximize.")
-    [A, b, c, u] = to_standard_form(m.A, m.rhs, m.obj, m.lb, m.ub, m.sense);
+    [A, b, c, u, cost_change] = to_standard_form(m.A, m.rhs, m.obj, m.lb, m.ub, m.sense);
     m_std.A     = A;
     m_std.rhs   = b;
     m_std.obj   = c;
     m_std.ub    = u;
     m_std.lb    = zeros(length(c), 1);
     m_std.sense = '=';
+    params.Method = 2;
+    results_std = gurobi(m_std, params);
+    assert(abs(results.objval-results_std.objval-cost_change) < 1e-6, "Transfermation failed!")
     gurobi_write(m_std, fullfile(pwd, 'standard', lp_files(k).name))
 end
 waitbar(1, f, 'Done!');
@@ -40,7 +44,7 @@ close(f)
 
 
 %% Main function: transfer a general form LP to standard.
-function [A_std, b_std, c_std, u_std] = to_standard_form(A, b, c, l, u, sense)
+function [A_std, b_std, c_std, u_std, cost_change] = to_standard_form(A, b, c, l, u, sense)
 
 % Copy input matrices
 A_std = A;
@@ -97,6 +101,14 @@ if any(bounded_vars)
 end
 if any(up_free_vars)
     b_std = b_std - A_std(:, up_free_vars) * l(up_free_vars);
+end
+
+cost_change = 0;
+if any(bounded_vars | up_free_vars)
+    cost_change = cost_change + c_std(bounded_vars | up_free_vars)' * l(bounded_vars | up_free_vars);
+end
+if any(down_free_vars)
+    cost_change = cost_change + c_std(down_free_vars)' * u(down_free_vars);
 end
 
 end

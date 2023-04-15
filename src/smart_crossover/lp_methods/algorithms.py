@@ -5,7 +5,7 @@ from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Output
 from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.gurobi import GrbCaller
-from smart_crossover.solver_caller.utils import solve_lp_barrier, solve_lp
+from smart_crossover.solver_caller.solving import solve_lp_barrier, solve_lp
 
 
 def perturb_c(lp_ori: StandardLP,

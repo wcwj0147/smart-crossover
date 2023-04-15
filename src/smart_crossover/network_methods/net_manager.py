@@ -7,7 +7,7 @@ from smart_crossover.formats import MinCostFlow, StandardLP, OptTransport
 from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Basis, Output
 from smart_crossover.parameters import TOLERANCE_FOR_ARTIFICIAL_VARS, TOLERANCE_FOR_REDUCED_COSTS
-from smart_crossover.solver_caller.utils import solve_lp
+from smart_crossover.solver_caller.solving import solve_lp
 
 
 @runtime_checkable
@@ -134,7 +134,6 @@ class OTManager:
     """
 
     ot: OptTransport
-    ot_sub: OptTransport
     m: int
     n: int
     m_ext: int
@@ -150,6 +149,7 @@ class OTManager:
         self.n = ot.s.size * ot.d.size
         self.mask_sub_ot = np.zeros(self.n, dtype=bool)
         self.mcf = ot.to_MCF()
+        self.artificial_vars = np.array([])
 
     def get_X(self, x: np.ndarray) -> np.ndarray:
         """ Get X from the vector x, such that X[i][j] = the flow from source i to destination j. """
@@ -163,26 +163,30 @@ class OTManager:
 
     def extend_by_bigM(self, bigM: float) -> None:
         """ Extend the OT problem with bigM method. """
-        s_appended = np.concatenate([self.ot.s, np.sum(self.ot.d)])
-        d_appended = np.concatenate([self.ot.d, np.sum(self.ot.s)])
-        M_appended = sp.vstack([
-            sp.hstack([self.ot.M, bigM * np.ones((self.ot.s.size, 1))]),
-            sp.hstack([bigM * np.ones((self.ot.d.size, 1)), np.array([1])])
+        s_appended = np.append(self.ot.s, np.sum(self.ot.d))
+        d_appended = np.append(self.ot.d, np.sum(self.ot.s))
+        M_appended = np.vstack([
+            np.hstack([self.ot.M, bigM * bigM * np.ones((self.ot.s.size, 1))]),
+            np.hstack([bigM * np.ones((1, self.ot.d.size)), np.array([[1]])])
         ])
         self.mask_sub_ot = np.vstack([
             np.hstack([np.zeros((self.ot.s.size, self.ot.d.size),  dtype=np.bool_), np.ones((self.ot.s.size, 1), dtype=np.bool_)]),
-            np.hstack([np.ones((self.ot.d.size, 1), dtype=np.bool_), np.array([1], dtype=np.bool_)]),
+            np.hstack([np.ones((1, self.ot.d.size), dtype=np.bool_), np.array([[1]], dtype=np.bool_)]),
         ])
         # self.artificial_vars all the variables in the self.mask_sub_ot such that it is 1:
-        self.artificial_vars = np.where(self.mask_sub_ot.flatten())[0]
+        self.artificial_vars = np.where(self.mask_sub_ot.ravel())[0]
         self.ot = OptTransport(s_appended, d_appended, M_appended)
         self.mcf = self.ot.to_MCF()
 
     def add_free_variables(self, ind_free: np.ndarray) -> None:
         """ Add free variables in the sub OT problem. """
-        mask_on_original_problem = self.mask_sub_ot[:-1, :-1]
-        mask_on_original_problem[ind_free] = True
-        self.mask_sub_ot[:-1, :-1] = mask_on_original_problem
+        if self.artificial_vars.size > 0:
+            mask_on_original_problem = self.mask_sub_ot[:-1, :-1]
+            rows, cols = np.unravel_index(ind_free, mask_on_original_problem.shape)
+            mask_on_original_problem[rows, cols] = True
+            self.mask_sub_ot[:-1, :-1] = mask_on_original_problem
+        else:
+            self.mask_sub_ot[ind_free.ravel()] = True
 
     def set_basis(self, basis: Basis) -> None:
         """ Add a feasible basis to the current OT problem. """
@@ -190,16 +194,23 @@ class OTManager:
 
     def recover_x_from_sub_x(self, x_sub: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
         x = np.zeros(self.ot.s.size * self.ot.d.size)
-        x[self.mask_sub_ot] = x_sub
+        x[self.mask_sub_ot.ravel()] = x_sub
         return x
 
     def recover_basis_from_sub_basis(self, basis_sub: Basis) -> Basis:
-        vbasis = np.zeros(self.ot.s.size * self.ot.d.size)
-        vbasis[self.mask_sub_ot] = basis_sub.vbasis
+        vbasis = -np.ones(self.ot.s.size * self.ot.d.size)
+        vbasis[self.mask_sub_ot.ravel()] = basis_sub.vbasis
         return Basis(vbasis, basis_sub.cbasis)
 
+    def get_sub_problem(self) -> MinCostFlow:
+        mcf = self.ot.to_MCF()
+        mcf.A = mcf.A.tocsc()[:, self.mask_sub_ot.ravel()]
+        mcf.c = self.ot.M.flatten()[self.mask_sub_ot.ravel()]
+        mcf.u = mcf.u[self.mask_sub_ot.ravel()]
+        return mcf
+
     def solve_subproblem(self, solver) -> Output:
-        return solve_lp(self.ot.to_MCF(), solver=solver, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot], self.basis.cbasis))
+        return solve_lp(self.get_sub_problem(), solver=solver, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis))
 
     def recover_obj_val(self, obj_val):
         return obj_val
@@ -208,7 +219,7 @@ class OTManager:
         return self.mcf.c - self.mcf.A.T @ y
 
     def check_optimality_condition(self, x: np.ndarray[np.float_], y: np.ndarray[np.float_]) -> bool:
-        artificial_vars_condition = np.all(x[self.artificial_vars] < TOLERANCE_FOR_ARTIFICIAL_VARS) if self.artificial_vars.size > 0 else True
+        artificial_vars_condition = np.all(x[self.artificial_vars][:-1] < TOLERANCE_FOR_ARTIFICIAL_VARS) if self.artificial_vars > 0 else True
         rcost_condition = np.all(self.get_reduced_cost_for_original_OT(y) >= -TOLERANCE_FOR_REDUCED_COSTS)
         return artificial_vars_condition and rcost_condition
 
@@ -216,6 +227,7 @@ class OTManager:
         pass
 
     def set_initial_basis(self) -> None:
-        vbasis = np.concatenate([-np.ones(self.n), np.zeros(self.m + 1)])
+        vbasis = -np.ones(self.ot.s.size * self.ot.d.size)
+        vbasis[self.artificial_vars] = 0
         cbasis = np.concatenate([-np.ones(self.m + 1), np.zeros(1)])
         self.basis = Basis(vbasis, cbasis)
