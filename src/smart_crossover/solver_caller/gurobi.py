@@ -85,6 +85,7 @@ class GrbCaller(SolverCaller):
         self.model.setAttr("CBasis", self.model.getConstrs(), basis.cbasis.tolist())
         self.model.setParam("LPWarmStart", 2)  # Make warm-start basis work when conduct presolve.
 
+
     def add_warm_start_solution(self,
                                 start_solution: Tuple[np.ndarray[np.float64], np.ndarray[np.float64]]):
         self.model.setAttr("PStart", self.model.getVars(), start_solution[0].tolist())
@@ -102,30 +103,20 @@ class GrbCaller(SolverCaller):
         self.model.setParam("Method", 2)
         self.model.setParam("BarConvTol", self.settings.barrierTol)
         self.model.setParam("Crossover", -1)
-        self._set_log()
-        self._set_time_limit()
-        self.turn_off_presolve()
         self._run()
 
     def run_barrier_no_crossover(self) -> None:
         self.model.setParam("Method", 2)
         self.model.setParam("BarConvTol", self.settings.barrierTol)
         self.model.setParam("Crossover", 0)
-        self._set_log()
-        self._set_time_limit()
         self._run()
 
     def run_simplex(self) -> None:
         self.model.setParam("Method", -1)
-        self._set_log()
-        self._set_time_limit()
-        self.turn_off_presolve()
         self._run()
 
     def run_network_simplex(self) -> None:
         self.model.setParam("NetworkAlg", 1)
-        self._set_log()
-        self._set_time_limit()
         self._run()
 
     def reset_model(self) -> None:
@@ -165,6 +156,9 @@ class GrbCaller(SolverCaller):
         return np.array(self.model.getAttr("RC", self.model.getVars()))
 
     def _run(self) -> None:
+        self._set_log()
+        self._set_time_limit()
+        self._set_presolve()
         self.model.optimize()
 
     def _set_presolve(self) -> None:
@@ -176,6 +170,3 @@ class GrbCaller(SolverCaller):
 
     def _set_time_limit(self) -> None:
         self.model.setParam("TimeLimit", self.settings.timeLimit)
-
-    def turn_off_presolve(self) -> None:
-        self.model.setParam("Presolve", 0)

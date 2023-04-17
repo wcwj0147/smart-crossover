@@ -7,7 +7,8 @@ from smart_crossover.formats import MinCostFlow, StandardLP, OptTransport
 from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Basis, Output
 from smart_crossover.parameters import TOLERANCE_FOR_ARTIFICIAL_VARS, TOLERANCE_FOR_REDUCED_COSTS
-from smart_crossover.solver_caller.solving import solve_lp
+from smart_crossover.solver_caller.caller import SolverSettings
+from smart_crossover.solver_caller.solving import solve_mcf
 
 
 @runtime_checkable
@@ -27,7 +28,7 @@ class NetworkManager(Protocol):
     def recover_basis_from_sub_basis(self, basis_sub: Basis) -> Basis:
         ...
 
-    def solve_subproblem(self, solver: str) -> Output:
+    def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         ...
 
     def recover_obj_val(self, obj_val: float) -> float:
@@ -103,7 +104,7 @@ class MCFManager(LPManager):
         f_1 = A_barplus @ x_hat
         f_2 = A_barminus @ x_hat
         f = np.maximum(f_1, f_2)
-        f_inv = 1 / f
+        f_inv = np.divide(1, f, out=np.zeros_like(f), where=f != 0)
         row, col, a = sp.find(A_bar)
         val = f_inv[row] * x_hat[col]
         r = sp.csc_matrix((val * a, (row, col)), shape=(self.m, self.n))
@@ -167,7 +168,7 @@ class OTManager:
         d_appended = np.append(self.ot.d, np.sum(self.ot.s))
         M_appended = np.vstack([
             np.hstack([self.ot.M, bigM * bigM * np.ones((self.ot.s.size, 1))]),
-            np.hstack([bigM * np.ones((1, self.ot.d.size)), np.array([[1]])])
+            np.hstack([bigM * np.ones((1, self.ot.d.size)), np.array([[0]])])
         ])
         self.mask_sub_ot = np.vstack([
             np.hstack([np.zeros((self.ot.s.size, self.ot.d.size),  dtype=np.bool_), np.ones((self.ot.s.size, 1), dtype=np.bool_)]),
@@ -209,8 +210,8 @@ class OTManager:
         mcf.u = mcf.u[self.mask_sub_ot.ravel()]
         return mcf
 
-    def solve_subproblem(self, solver) -> Output:
-        return solve_lp(self.get_sub_problem(), solver=solver, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis))
+    def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
+        return solve_mcf(self.get_sub_problem(), solver=solver, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis), presolve=solver_settings.presolve)
 
     def recover_obj_val(self, obj_val):
         return obj_val
@@ -219,7 +220,7 @@ class OTManager:
         return self.mcf.c - self.mcf.A.T @ y
 
     def check_optimality_condition(self, x: np.ndarray[np.float_], y: np.ndarray[np.float_]) -> bool:
-        artificial_vars_condition = np.all(x[self.artificial_vars][:-1] < TOLERANCE_FOR_ARTIFICIAL_VARS) if self.artificial_vars > 0 else True
+        artificial_vars_condition = np.all(x[self.artificial_vars][:-1] < TOLERANCE_FOR_ARTIFICIAL_VARS) if self.artificial_vars.size > 0 else True
         rcost_condition = np.all(self.get_reduced_cost_for_original_OT(y) >= -TOLERANCE_FOR_REDUCED_COSTS)
         return artificial_vars_condition and rcost_condition
 

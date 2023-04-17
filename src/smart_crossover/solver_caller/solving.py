@@ -18,70 +18,73 @@ def generate_solver_caller(solver: str = "GRB",
     return runner
 
 
-def solve_lp_barrier(lp: StandardLP,
-                     solver: str = "GRB",
-                     barrierTol: float = 1e-8,
-                     optimalityTol: float = 1e-6) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(barrierTol=barrierTol, optimalityTol=optimalityTol))
-    solver_caller.read_lp(lp)
-    solver_caller.run_barrier()
-    return solver_caller.return_output()
-
-
 def solve_lp(lp: StandardLP,
              solver: str = "GRB",
+             method: str = "default",
              optimalityTol: float = 1e-6,
+             barrierTol: float = 1e-8,
+             presolve: int = -1,
              warm_start_basis: Optional[Basis] = None,
              warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(optimalityTol=optimalityTol))
+    solver_caller = generate_solver_caller(solver, SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol))
     solver_caller.read_lp(lp)
-    if warm_start_solution is not None:
-        solver_caller.add_warm_start_solution(warm_start_solution)
-    if warm_start_basis is not None:
-        solver_caller.add_warm_start_basis(warm_start_basis)
-    solver_caller.run_simplex()
+    if method == "default":
+        if warm_start_solution is not None:
+            solver_caller.add_warm_start_solution(warm_start_solution)
+        if warm_start_basis is not None:
+            solver_caller.add_warm_start_basis(warm_start_basis)
+        solver_caller.run_simplex()
+    elif method == "barrier":
+        solver_caller.run_barrier()
+    else:
+        raise ValueError("Invalid method specified. Choose from 'default' or 'barrier'.")
     return solver_caller.return_output()
 
 
 def solve_mcf(mcf: MinCostFlow,
               solver: str = "GRB",
+              method: str = "default",
+              presolve: int = -1,
               optimalityTol: float = 1e-6,
+              barrierTol: float = 1e-8,
               warm_start_basis: Optional[Basis] = None) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(optimalityTol=optimalityTol))
+    solver_settings = SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol)
+    solver_caller = generate_solver_caller(solver, solver_settings)
     solver_caller.read_mcf(mcf)
-    if warm_start_basis is not None:
-        solver_caller.add_warm_start_basis(warm_start_basis)
-    solver_caller.run_simplex()
-    return solver_caller.return_output()
+    if method == "default":
+        if warm_start_basis is not None:
+            solver_caller.add_warm_start_basis(warm_start_basis)
+        solver_caller.run_simplex()
+    elif method == "barrier":
+        solver_caller.run_barrier()
+    elif method == "network_simplex":
+        solver_caller.run_network_simplex()
+    else:
+        raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
 
-
-def solve_mcf_barrier(mcf: MinCostFlow,
-                      solver: str = "GRB",
-                      barrierTol: float = 1e-8,
-                      optimalityTol: float = 1e-6) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(barrierTol=barrierTol, optimalityTol=optimalityTol))
-    solver_caller.read_mcf(mcf)
-    solver_caller.run_barrier()
     return solver_caller.return_output()
 
 
 def solve_ot(ot: OptTransport,
              solver: str = "GRB",
+             method: str = "default",
+             presolve: int = -1,
              optimalityTol: float = 1e-6,
+             barrierTol: float = 1e-8,
              warm_start_basis: Optional[Basis] = None) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(optimalityTol=optimalityTol))
+    solver_settings = SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol)
+    solver_caller = generate_solver_caller(solver, solver_settings)
     solver_caller.read_ot(ot)
-    if warm_start_basis is not None:
-        solver_caller.add_warm_start_basis(warm_start_basis)
-    solver_caller.run_simplex()
-    return solver_caller.return_output()
 
+    if method == "default":
+        if warm_start_basis is not None:
+            solver_caller.add_warm_start_basis(warm_start_basis)
+        solver_caller.run_simplex()
+    elif method == "barrier":
+        solver_caller.run_barrier()
+    elif method == "network_simplex":
+        solver_caller.run_network_simplex()
+    else:
+        raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
 
-def solve_ot_barrier(ot: OptTransport,
-                     solver: str = "GRB",
-                     barrierTol: float = 1e-8,
-                     optimalityTol: float = 1e-6) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(barrierTol=barrierTol, optimalityTol=optimalityTol))
-    solver_caller.read_ot(ot)
-    solver_caller.run_barrier()
     return solver_caller.return_output()

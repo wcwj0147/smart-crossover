@@ -18,6 +18,7 @@ class StandardLP:
     b: np.ndarray
     c: np.ndarray
     u: np.ndarray
+    name: str = "lp_instance"
 
 
 @dataclass
@@ -50,6 +51,7 @@ class OptTransport:
     s: np.ndarray[np.float64]
     d: np.ndarray[np.float64]
     M: Union[sp.csr_matrix, np.ndarray[np.float64]]
+    name: str = "ot_instance"
 
     def __post_init__(self) -> None:
         if not np.isclose(np.sum(self.s), np.sum(self.d), atol=1e-8):

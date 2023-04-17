@@ -28,3 +28,9 @@ class Output:
     bar_iter_count: Optional[int] = None
     rcost: Optional[np.ndarray[float]] = None
     basis: Optional[Basis] = None
+
+    def __str__(self) -> str:
+        return (f"Output(obj_val={self.obj_val}, "
+                f"runtime={self.runtime}, "
+                f"iter_count={self.iter_count}, "
+                f"bar_iter_count={self.bar_iter_count})")

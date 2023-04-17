@@ -7,6 +7,7 @@ from smart_crossover.network_methods.net_manager import OTManager, MCFManager, N
 from smart_crossover.network_methods.tree_BI import tree_basis_identify
 from smart_crossover.output import Output
 from smart_crossover.parameters import COLUMN_GENERATION_RATIO
+from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.timer import Timer
 
 
@@ -16,6 +17,7 @@ def network_crossover(
         mcf: Optional[MinCostFlow] = None,
         method: str = "tnet",
         solver: str = "GRB",
+        solver_settings: SolverSettings = SolverSettings(),
     ) -> Output:
     """
     Solve the network problem (MCF/OT) using TNET, CNET_OT, or CNET_MCF algorithms.
@@ -26,6 +28,7 @@ def network_crossover(
         x: an interior-point / inaccurate solution of the network problem to warm-start the basis identification.
         method: the algorithm to use ('tnet', 'cnet_ot', or 'cnet_mcf').
         solver: the solver to use.
+        solver_settings: the settings for the solver.
 
     Returns:
         the output of the selected algorithm.
@@ -62,7 +65,7 @@ def network_crossover(
         manager.set_initial_basis()
 
     timer.end_timer()
-    cg_output = column_generation(manager, queue, solver)
+    cg_output = column_generation(manager, queue, solver, solver_settings)
 
     return Output(x=cg_output.x, obj_val=cg_output.obj_val,
                   runtime=timer.total_duration + cg_output.runtime,
@@ -72,7 +75,8 @@ def network_crossover(
 
 def column_generation(net_manager: NetworkManager,
                       queue: np.ndarray[np.int64],
-                      solver: str) -> Output:
+                      solver: str,
+                      solver_settings: SolverSettings) -> Output:
 
     # Initialize the column generation.
     timer = Timer()
@@ -95,7 +99,7 @@ def column_generation(net_manager: NetworkManager,
 
         # Solve the sub problem.
         timer.end_timer()
-        sub_output = net_manager.solve_subproblem(solver)
+        sub_output = net_manager.solve_subproblem(solver, solver_settings)
         obj_val = net_manager.recover_obj_val(sub_output.obj_val)
         timer.accumulate_time(sub_output.runtime)
         timer.start_timer()

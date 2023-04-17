@@ -1,9 +1,27 @@
 import numpy as np
 
 from smart_crossover.formats import OptTransport
+from smart_crossover.output import Output
+from smart_crossover.timer import Timer
 
 
-def sinkhorn(ot_instance: OptTransport, reg: float, num_iter: int = 1000, tol: float = 1e-9) -> np.ndarray:
+def sinkhorn(ot_instance: OptTransport, reg: float = 0.2, num_iter: int = 1000, tol: float = 1e-9) -> Output:
+    """
+    Compute the optimal transport plan using the Sinkhorn algorithm.
+
+    Args:
+        ot_instance: the optimal transport problem.
+        reg: the regularization term.
+        num_iter: the maximum number of iterations.
+        tol: the tolerance for convergence.
+
+    Returns:
+        the output, including the optimal transport plan and the runtime.
+
+    """
+    timer = Timer()
+    timer.start_timer()
+
     s, d, M = ot_instance.s, ot_instance.d, ot_instance.M
     n, m = M.shape
 
@@ -27,4 +45,5 @@ def sinkhorn(ot_instance: OptTransport, reg: float, num_iter: int = 1000, tol: f
     # Compute the optimal transport plan
     P = np.diag(u) @ K @ np.diag(v)
 
-    return P
+    timer.end_timer()
+    return Output(obj_val=np.float64(np.sum(P*M)), x=P.ravel(), x_bar=P.ravel(), runtime=timer.total_duration)

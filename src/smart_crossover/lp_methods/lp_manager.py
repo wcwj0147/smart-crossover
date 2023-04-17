@@ -4,6 +4,7 @@ from scipy import sparse as sp
 from smart_crossover.parameters import TOLERANCE_FOR_ARTIFICIAL_VARS, TOLERANCE_FOR_REDUCED_COSTS
 from smart_crossover.formats import StandardLP
 from smart_crossover.output import Basis, Output
+from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_lp
 
 
@@ -108,6 +109,6 @@ class LPManager:
         rcost_condition = np.all(self.get_reduced_cost_for_original_lp(y) >= -TOLERANCE_FOR_REDUCED_COSTS)
         return artificial_vars_condition and rcost_condition
 
-    def solve_subproblem(self, solver: str = 'GRB') -> Output:
+    def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         """ Solve the sub problem. """
-        return solve_lp(self.lp_sub, solver=solver, warm_start_basis=Basis(self.basis.vbasis[self.var_info['free']], self.basis.cbasis))
+        return solve_lp(self.lp_sub, solver=solver, warm_start_basis=Basis(self.basis.vbasis[self.var_info['free']], self.basis.cbasis), presolve=solver_settings.presolve)

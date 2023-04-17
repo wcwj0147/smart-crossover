@@ -2,7 +2,6 @@ from typing import List, Tuple
 
 import numpy as np
 from scipy import sparse as sp
-import networkx as nx
 
 from smart_crossover.formats import OptTransport
 from smart_crossover.network_methods.net_manager import OTManager
@@ -18,6 +17,32 @@ def tree_basis_identify(ot_manager: OTManager, flow_weights: np.ndarray) -> Tupl
     return tree_basis, push_iter
 
 
+class UnionFind:
+    def __init__(self, n: int):
+        self.parent = list(range(n))
+        self.rank = [0] * n
+
+    def find(self, x: int) -> int:
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])
+        return self.parent[x]
+
+    def unite(self, x: int, y: int) -> None:
+        x_root = self.find(x)
+        y_root = self.find(y)
+
+        if x_root == y_root:
+            return
+
+        if self.rank[x_root] < self.rank[y_root]:
+            self.parent[x_root] = y_root
+        elif self.rank[x_root] > self.rank[y_root]:
+            self.parent[y_root] = x_root
+        else:
+            self.parent[y_root] = x_root
+            self.rank[x_root] += 1
+
+
 def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.ndarray[np.int_]:
     def edge_list() -> List[Tuple[int, int, float, int]]:
         edges_list = []
@@ -29,13 +54,23 @@ def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.n
         return edges_list
 
     edges = edge_list()
-    G = nx.Graph()
-    G.add_weighted_edges_from([(u, v, weight) for u, v, weight, _ in edges])
+    edges.sort(key=lambda edge: edge[2], reverse=True)
 
-    tree_edges = nx.algorithms.tree.maximum_spanning_edges(G, algorithm='kruskal', data=False)
-    tree_edge_indices = [next(index for u, v, _, index in edges if (edge == (u, v) or edge == (v, u))) for edge in tree_edges]
+    n = ot.s.size + ot.d.size
+    uf = UnionFind(n)
+    tree_edges = np.full(n - 1, -1, dtype=np.int_)
 
-    return np.array(tree_edge_indices, dtype=np.int_)
+    edge_count = 0
+    for edge in edges:
+        u, v, weight, index = edge
+        if uf.find(u) != uf.find(v):
+            uf.unite(u, v)
+            tree_edges[edge_count] = index
+            edge_count += 1
+            if edge_count == n - 1:
+                break
+
+    return tree_edges
 
 
 def push_tree_to_bfs(ot_manager: OTManager, tree: np.ndarray[np.int_]) -> Tuple[np.ndarray, int]:
