@@ -6,6 +6,9 @@ from typing import Union, Tuple
 
 import gurobipy
 import numpy as np
+import scipy.sparse as sp
+import cplex
+import mosek.fusion as mf
 
 from smart_crossover.formats import MinCostFlow, OptTransport, StandardLP
 from smart_crossover.output import Basis, Output
@@ -13,7 +16,7 @@ from smart_crossover.output import Basis, Output
 
 @dataclass
 class SolverSettings:
-    presolve: int = 0
+    presolve: str = "on"
     barrierTol: float = 1e-8
     optimalityTol: float = 1e-6
     timeLimit: int = 600
@@ -24,7 +27,7 @@ class SolverSettings:
 class SolverCaller(ABC):
     """Class to call optimization solver on LP problems."""
     solver_name: str
-    model: Union[gurobipy.Model]
+    model: Union[gurobipy.Model, cplex.Cplex, mf.Model]
 
     def read_model_from_file(self, path: str) -> None:
         """Read a model from .mps/.lp file in the given file path."""
@@ -37,9 +40,24 @@ class SolverCaller(ABC):
         ...
 
     def read_ot(self, ot: OptTransport) -> None:
-        ...
+        self.read_mcf(ot.to_MCF())
 
     def read_lp(self, lp: StandardLP) -> None:
+        ...
+
+    def get_A(self) -> sp.csr_matrix:
+        ...
+
+    def get_b(self) -> np.ndarray:
+        ...
+
+    def get_sense(self) -> np.ndarray:
+        ...
+
+    def get_c(self) -> np.ndarray:
+        ...
+
+    def get_u(self) -> np.ndarray:
         ...
 
     def add_warm_start_basis(self,
@@ -47,17 +65,17 @@ class SolverCaller(ABC):
         ...
 
     def add_warm_start_solution(self,
-                                start_solution: Tuple[np.ndarray[np.float64], np.ndarray[np.float64]]):
+                                start_solution: Tuple[np.ndarray, np.ndarray]):
         ...
 
     def return_basis(self) -> Basis:
         ...
 
     def return_MCF(self) -> MinCostFlow:
-        ...
+        return MinCostFlow(self.get_A(), self.get_b(), self.get_c(), self.get_u())
 
     def return_StdLP(self) -> StandardLP:
-        ...
+        return StandardLP(self.get_A(), self.get_b(), self.get_c(), self.get_u())
 
     def return_x(self) -> np.ndarray:
         ...
@@ -93,30 +111,41 @@ class SolverCaller(ABC):
                       basis=self.return_basis()
                       )
 
-    def turn_off_presolve(self) -> None:
+    def run_default(self) -> None:
+        """Run the default algorithm on the current model."""
         ...
 
     def run_barrier(self) -> None:
         """Run barrier algorithm on the current model, crossover on."""
         ...
 
+    def run_barrier_no_crossover(self) -> None:
+        """Run barrier algorithm on the current model, crossover off."""
+        ...
+
     def run_simplex(self) -> None:
-        """Run simplex/network simplex algorithm on the current model."""
+        ...
+
+    def run_dual_simplex(self) -> None:
         ...
 
     def run_network_simplex(self) -> None:
-        ...
-
-    def run_barrier_no_crossover(self) -> None:
-        """Run barrier algorithm on the current model, crossover off."""
         ...
 
     def reset_model(self) -> None:
         ...
 
     def _run(self) -> None:
-        """Run the solver with the current settings."""
         ...
 
-    def get_model_report(self) -> None:
+    def _set_presolve(self) -> None:
+        ...
+
+    def _set_log(self) -> None:
+        ...
+
+    def _set_time_limit(self) -> None:
+        ...
+
+    def _set_tol(self) -> None:
         ...

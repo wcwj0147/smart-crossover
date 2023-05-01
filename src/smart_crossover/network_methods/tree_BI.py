@@ -2,6 +2,7 @@ from typing import List, Tuple
 
 import numpy as np
 from scipy import sparse as sp
+import scipy.sparse.linalg
 
 from smart_crossover.formats import OptTransport
 from smart_crossover.network_methods.net_manager import OTManager
@@ -43,7 +44,7 @@ class UnionFind:
             self.rank[x_root] += 1
 
 
-def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.ndarray[np.int_]:
+def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.ndarray:
     def edge_list() -> List[Tuple[int, int, float, int]]:
         edges_list = []
         n_rows, n_cols = ot.M.shape
@@ -73,7 +74,7 @@ def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.n
     return tree_edges
 
 
-def push_tree_to_bfs(ot_manager: OTManager, tree: np.ndarray[np.int_]) -> Tuple[np.ndarray, int]:
+def push_tree_to_bfs(ot_manager: OTManager, tree: np.ndarray) -> Tuple[np.ndarray, int]:
     ot = ot_manager.ot
     B = ot_manager.mcf.A.tocsc()[:-1, :][:, tree]
     # tree_solution is the solution of the equation: B * x = ot_manager.mcf.b[:-1]

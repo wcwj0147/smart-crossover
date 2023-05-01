@@ -1,4 +1,5 @@
-from typing import Tuple, runtime_checkable, Protocol
+from typing import Tuple
+from typing_extensions import Protocol
 
 import numpy as np
 from scipy import sparse as sp
@@ -11,7 +12,6 @@ from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_mcf
 
 
-@runtime_checkable
 class NetworkManager(Protocol):
     """ A protocol for network problem managers, including MinCostFlow and OptimalTransport. """
 
@@ -19,10 +19,10 @@ class NetworkManager(Protocol):
     n: int
     basis: Basis
 
-    def get_sorted_flows(self, x: np.ndarray[np.float_]) -> Tuple[np.ndarray[np.int_], np.ndarray[np.float_]]:
+    def get_sorted_flows(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         ...
 
-    def recover_x_from_sub_x(self, x_sub: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    def recover_x_from_sub_x(self, x_sub: np.ndarray) -> np.ndarray:
         ...
 
     def recover_basis_from_sub_basis(self, basis_sub: Basis) -> Basis:
@@ -34,7 +34,7 @@ class NetworkManager(Protocol):
     def recover_obj_val(self, obj_val: float) -> float:
         ...
 
-    def check_optimality_condition(self, x: np.ndarray[np.float_], y: np.ndarray[np.float_]) -> bool:
+    def check_optimality_condition(self, x: np.ndarray, y: np.ndarray) -> bool:
         ...
 
     def add_free_variables(self, ind_free: np.ndarray) -> None:
@@ -73,6 +73,17 @@ class MCFManager(LPManager):
         else:
             raise ValueError("Expected a MinCostFlow instance")
 
+    @property
+    def lp_sub(self) -> StandardLP:
+        return self.mcf_sub
+
+    @lp_sub.setter
+    def lp_sub(self, value: StandardLP) -> None:
+        if isinstance(value, MinCostFlow):
+            self.mcf_sub = value
+        else:
+            raise ValueError("Expected a MinCostFlow instance")
+
     def extend_by_bigM(self, bigM: float) -> None:
         """ Extend the MCF problem by the bigM method. """
         mask_fix_up = np.zeros(self.n, dtype=bool)
@@ -90,7 +101,7 @@ class MCFManager(LPManager):
         self.artificial_vars = np.array(range(self.n, self.n + self.m), dtype=int)
         self.var_info['free'] = np.append(self.var_info['free'], np.array(range(self.n, self.n + self.m), dtype=np.int64))
 
-    def get_sorted_flows(self, x: np.ndarray[np.float_]) -> Tuple[np.ndarray[np.int_], np.ndarray[np.float_]]:
+    def get_sorted_flows(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """ Get the sorted flows by calculating flow indicators. """
         # Reverse large flow.
         mask_large_x = x > self.mcf.u / 2
@@ -119,6 +130,11 @@ class MCFManager(LPManager):
         cbasis = np.concatenate([-np.ones(self.m), np.zeros(1)])
         self.set_basis(Basis(vbasis, cbasis))
 
+    def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
+        """ Solve the sub problem. """
+        method = "network_simplex" if solver == "CPL" else "default"
+        return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['free']], self.basis.cbasis), presolve=solver_settings.presolve)
+
 
 class OTManager:
     """A class to manage the OT problem and its subproblem in network crossover algorithms.
@@ -139,9 +155,9 @@ class OTManager:
     n: int
     m_ext: int
     n_ext: int
-    mask_sub_ot: np.ndarray[np.bool_]
+    mask_sub_ot: np.ndarray
     basis: Basis
-    artificial_vars: np.ndarray[np.int64]
+    artificial_vars: np.ndarray
     mcf: MinCostFlow
 
     def __init__(self, ot: OptTransport) -> None:
@@ -156,7 +172,7 @@ class OTManager:
         """ Get X from the vector x, such that X[i][j] = the flow from source i to destination j. """
         return x.reshape((self.ot.s.size, self.ot.d.size))
 
-    def get_sorted_flows(self, x: np.ndarray) -> Tuple[np.ndarray[np.int_], np.ndarray[np.float_]]:
+    def get_sorted_flows(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """ Get the sorted flows by calculating flow indicators. """
         X = self.get_X(x)
         flow_indicators = np.maximum(X / self.ot.s.reshape((self.ot.s.size, 1)), X / self.ot.d.reshape((1, self.ot.d.size)))
@@ -193,7 +209,7 @@ class OTManager:
         """ Add a feasible basis to the current OT problem. """
         self.basis = basis
 
-    def recover_x_from_sub_x(self, x_sub: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    def recover_x_from_sub_x(self, x_sub: np.ndarray) -> np.ndarray:
         x = np.zeros(self.ot.s.size * self.ot.d.size)
         x[self.mask_sub_ot.ravel()] = x_sub
         return x
@@ -211,15 +227,16 @@ class OTManager:
         return mcf
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
-        return solve_mcf(self.get_sub_problem(), solver=solver, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis), presolve=solver_settings.presolve)
+        method = "network_simplex" if solver == "CPL" else "default"
+        return solve_mcf(self.get_sub_problem(), solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis), presolve=solver_settings.presolve)
 
     def recover_obj_val(self, obj_val):
         return obj_val
 
-    def get_reduced_cost_for_original_OT(self, y: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    def get_reduced_cost_for_original_OT(self, y: np.ndarray) -> np.ndarray:
         return self.mcf.c - self.mcf.A.T @ y
 
-    def check_optimality_condition(self, x: np.ndarray[np.float_], y: np.ndarray[np.float_]) -> bool:
+    def check_optimality_condition(self, x: np.ndarray, y: np.ndarray) -> bool:
         artificial_vars_condition = np.all(x[self.artificial_vars][:-1] < TOLERANCE_FOR_ARTIFICIAL_VARS) if self.artificial_vars.size > 0 else True
         rcost_condition = np.all(self.get_reduced_cost_for_original_OT(y) >= -TOLERANCE_FOR_REDUCED_COSTS)
         return artificial_vars_condition and rcost_condition

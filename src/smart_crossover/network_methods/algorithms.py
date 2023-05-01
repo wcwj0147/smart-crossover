@@ -12,7 +12,7 @@ from smart_crossover.timer import Timer
 
 
 def network_crossover(
-        x: np.ndarray[np.float_],
+        x: np.ndarray,
         ot: Optional[OptTransport] = None,
         mcf: Optional[MinCostFlow] = None,
         method: str = "tnet",
@@ -74,7 +74,7 @@ def network_crossover(
 
 
 def column_generation(net_manager: NetworkManager,
-                      queue: np.ndarray[np.int64],
+                      queue: np.ndarray,
                       solver: str,
                       solver_settings: SolverSettings) -> Output:
 

@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import sparse as sp
+from typing import Dict
 
 from smart_crossover.parameters import TOLERANCE_FOR_ARTIFICIAL_VARS, TOLERANCE_FOR_REDUCED_COSTS
 from smart_crossover.formats import StandardLP
@@ -26,7 +27,7 @@ class LPManager:
     m: int
     n: int
     lp: StandardLP
-    var_info: dict[str, np.ndarray[np.int64]]
+    var_info: Dict[str, np.ndarray]
     lp_sub: StandardLP
     basis: Basis
 
@@ -78,7 +79,7 @@ class LPManager:
         self.lp.c = self.lp.c / factor
         self.c_rescaling_factor = factor
 
-    def recover_x_from_sub_x(self, x_sub: np.ndarray[np.float_]) -> np.ndarray[np.float_]:
+    def recover_x_from_sub_x(self, x_sub: np.ndarray) -> np.ndarray:
         """ Recover the solution of the current LP from a solution of the sub problem. """
         x = np.zeros(self.lp.c.size)
         x[self.var_info['free']] = x_sub
@@ -103,7 +104,7 @@ class LPManager:
         rcost[self.basis.vbasis == -2] = -rcost[self.basis.vbasis == -2]
         return rcost
 
-    def check_optimality_condition(self, x: np.ndarray[np.float_], y: np.ndarray[np.float_]) -> bool:
+    def check_optimality_condition(self, x: np.ndarray, y: np.ndarray) -> bool:
         """ Check the optimality condition for the current LP and a pair of primal-dual solution (x, y). """
         artificial_vars_condition = np.all(x[self.artificial_vars] < TOLERANCE_FOR_ARTIFICIAL_VARS) if self.artificial_vars.size > 0 else True
         rcost_condition = np.all(self.get_reduced_cost_for_original_lp(y) >= -TOLERANCE_FOR_REDUCED_COSTS)

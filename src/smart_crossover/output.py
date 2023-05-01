@@ -9,8 +9,8 @@ import numpy as np
 class Basis:
     """Information of: vbasis and cbasis."""
 
-    vbasis: np.ndarray[np.float_]
-    cbasis: np.ndarray[np.float_]
+    vbasis: np.ndarray
+    cbasis: np.ndarray
 
     def __post_init__(self):
         self.vbasis = self.vbasis.astype(int)
@@ -19,14 +19,14 @@ class Basis:
 
 @dataclass(frozen=True)
 class Output:
-    x: Optional[np.ndarray[np.float_]] = None
-    y: Optional[np.ndarray[np.float_]] = None
-    x_bar: Optional[np.ndarray[np.float_]] = None
+    x: Optional[np.ndarray] = None
+    y: Optional[np.ndarray] = None
+    x_bar: Optional[np.ndarray] = None
     obj_val: Optional[float] = None
     runtime: Optional[datetime.timedelta] = None
     iter_count: Optional[float] = None
     bar_iter_count: Optional[int] = None
-    rcost: Optional[np.ndarray[float]] = None
+    rcost: Optional[np.ndarray] = None
     basis: Optional[Basis] = None
 
     def __str__(self) -> str:

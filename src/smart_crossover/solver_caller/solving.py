@@ -5,17 +5,22 @@ import numpy as np
 from smart_crossover.formats import StandardLP, MinCostFlow, OptTransport
 from smart_crossover.output import Output, Basis
 from smart_crossover.solver_caller.caller import SolverSettings, SolverCaller
+from smart_crossover.solver_caller.cplex import CplCaller
 from smart_crossover.solver_caller.gurobi import GrbCaller
+from smart_crossover.solver_caller.mosek import MskCaller
 
 
 def generate_solver_caller(solver: str = "GRB",
                            solver_settings: SolverSettings = SolverSettings()) -> SolverCaller:
     if solver == "GRB":
-        runner = GrbCaller(solver_settings)
+        caller = GrbCaller(solver_settings)
+    elif solver == "CPL":
+        caller = CplCaller(solver_settings)
+    elif solver == "MSK":
+        caller = MskCaller(solver_settings)
     else:
-        runner = GrbCaller(solver_settings)
-    # Todo: add other solvers.
-    return runner
+        raise ValueError("Invalid solver specified. Choose from 'GRB' or 'CPL'.")
+    return caller
 
 
 def solve_lp(lp: StandardLP,
@@ -24,6 +29,7 @@ def solve_lp(lp: StandardLP,
              optimalityTol: float = 1e-6,
              barrierTol: float = 1e-8,
              presolve: int = -1,
+             crossover: str = 'on',
              warm_start_basis: Optional[Basis] = None,
              warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
     solver_caller = generate_solver_caller(solver, SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol))
@@ -33,9 +39,12 @@ def solve_lp(lp: StandardLP,
             solver_caller.add_warm_start_solution(warm_start_solution)
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        solver_caller.run_simplex()
+        solver_caller.run_default()
     elif method == "barrier":
-        solver_caller.run_barrier()
+        if crossover == 'on':
+            solver_caller.run_barrier()
+        else:
+            solver_caller.run_barrier_no_crossover()
     else:
         raise ValueError("Invalid method specified. Choose from 'default' or 'barrier'.")
     return solver_caller.return_output()
@@ -54,7 +63,7 @@ def solve_mcf(mcf: MinCostFlow,
     if method == "default":
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        solver_caller.run_simplex()
+        solver_caller.run_default()
     elif method == "barrier":
         solver_caller.run_barrier()
     elif method == "network_simplex":
@@ -79,7 +88,7 @@ def solve_ot(ot: OptTransport,
     if method == "default":
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        solver_caller.run_simplex()
+        solver_caller.run_default()
     elif method == "barrier":
         solver_caller.run_barrier()
     elif method == "network_simplex":

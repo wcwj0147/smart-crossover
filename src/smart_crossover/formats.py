@@ -31,6 +31,7 @@ class MinCostFlow(StandardLP):
     """
 
     def __post_init__(self) -> None:
+        self.A = self.A.tocsr()
         if not np.isclose(np.sum(self.b), 0, atol=1e-8):
             raise ValueError("The sum of the b array must be equal to 0.")
 
@@ -48,9 +49,9 @@ class OptTransport:
 
     """
 
-    s: np.ndarray[np.float64]
-    d: np.ndarray[np.float64]
-    M: Union[sp.csr_matrix, np.ndarray[np.float64]]
+    s: np.ndarray
+    d: np.ndarray
+    M: Union[sp.csr_matrix, np.ndarray]
     name: str = "ot_instance"
 
     def __post_init__(self) -> None:
