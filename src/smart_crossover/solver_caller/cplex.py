@@ -130,8 +130,8 @@ class CplCaller(SolverCaller):
     def return_runtime(self) -> datetime.timedelta:
         return datetime.timedelta(seconds=self.runtime)
 
-    def return_iter_count(self) -> float:
-        return self.model.solution.progress.get_num_iterations()
+    def return_iter_count(self) -> int:
+        return round(self.model.solution.progress.get_num_iterations())
 
     def return_bar_iter_count(self) -> int:
         return self.model.solution.progress.get_num_barrier_iterations()

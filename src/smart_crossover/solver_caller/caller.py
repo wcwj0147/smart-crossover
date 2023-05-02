@@ -92,7 +92,7 @@ class SolverCaller(ABC):
     def return_runtime(self) -> datetime.timedelta:
         ...
 
-    def return_iter_count(self) -> float:
+    def return_iter_count(self) -> int:
         ...
 
     def return_bar_iter_count(self) -> int:

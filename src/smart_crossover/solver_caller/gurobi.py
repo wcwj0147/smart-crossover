@@ -125,8 +125,8 @@ class GrbCaller(SolverCaller):
     def return_runtime(self) -> datetime.timedelta:
         return datetime.timedelta(seconds=self.model.Runtime)
 
-    def return_iter_count(self) -> float:
-        return self.model.IterCount
+    def return_iter_count(self) -> int:
+        return round(self.model.IterCount)
 
     def return_bar_iter_count(self) -> int:
         return self.model.BarIterCount

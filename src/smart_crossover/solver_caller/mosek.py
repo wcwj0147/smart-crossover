@@ -1,4 +1,5 @@
 import datetime
+import sys
 from typing import Optional, Tuple
 
 import numpy as np
@@ -8,6 +9,9 @@ import mosek
 from smart_crossover.formats import MinCostFlow, StandardLP
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
+
+
+MSK_INF = np.inf  # Only a symbolic constant, used for readability.
 
 
 class MskCaller(SolverCaller):
@@ -20,19 +24,21 @@ class MskCaller(SolverCaller):
 
     @property
     def task(self):
-        return self.model.getTask()
+        return self.model
 
     def read_model_from_file(self, path: str) -> None:
         self.task.readdata(path)
 
-    def read_lp(self, lp: StandardLP) -> None:
+    def read_lp(self, lp: MinCostFlow) -> None:
         num_vars = lp.c.size
         num_constraints = lp.A.shape[0]
 
         self.task.appendvars(num_vars)
         self.task.appendcons(num_constraints)
 
-        for i, (ai, bi) in enumerate(zip(lp.A, lp.b)):
+        for i in range(num_constraints):
+            ai = lp.A.getrow(i).toarray().ravel()
+            bi = lp.b[i]
             self.task.putarow(i, range(num_vars), ai)
             self.task.putconbound(i, mosek.boundkey.fx, bi, bi)
 
@@ -48,12 +54,18 @@ class MskCaller(SolverCaller):
         self.task.appendvars(num_vars)
         self.task.appendcons(num_constraints)
 
-        for i, (ai, bi) in enumerate(zip(mcf.A, mcf.b)):
+        for i in range(num_constraints):
+            ai = mcf.A.getrow(i).toarray().ravel()
+            bi = mcf.b[i]
             self.task.putarow(i, range(num_vars), ai)
             self.task.putconbound(i, mosek.boundkey.fx, bi, bi)
 
         self.task.putclist(range(num_vars), mcf.c)
-        self.task.putvarboundslice(0, num_vars, [mosek.boundkey.ra] * num_vars, [0.0] * num_vars, mcf.u)
+
+        var_list_lo = [ind for ind in range(num_vars) if mcf.u[ind] == np.inf]
+        var_list_ra = [ind for ind in range(num_vars) if mcf.u[ind] != np.inf and mcf.l[ind] != -np.inf]
+        self.task.putvarboundlist(var_list_ra, [mosek.boundkey.ra] * len(var_list_ra), [0.0] * len(var_list_ra), mcf.u[var_list_ra])
+        self.task.putvarboundlist(var_list_lo, [mosek.boundkey.lo] * len(var_list_lo), [0.0] * len(var_list_lo), [MSK_INF] * len(var_list_lo))
 
         self.task.putobjsense(mosek.objsense.minimize)
 
@@ -80,10 +92,10 @@ class MskCaller(SolverCaller):
         return np.array(self.task.getclist())
 
     def get_l(self) -> np.ndarray:
-        return np.array(self.task.variables.get_lower_bounds())
+        return np.array(self.task.getvarboundslice(0, self.task.getnumvar())[1])
 
     def get_u(self) -> np.ndarray:
-        return np.array(self.task.variables.get_upper_bounds())
+        return np.array(self.task.getvarboundslice(0, self.task.getnumvar())[2])
 
     def add_warm_start_basis(self,
                              basis: Basis) -> None:
@@ -98,23 +110,31 @@ class MskCaller(SolverCaller):
         self.task.puty(start_solution[1])
 
     def return_basis(self) -> Optional[Basis]:
-        skc = self.task.getskc()
+        skc = [mosek.stakey.unk] * self.task.getnumcon()
+        self.task.getskc(mosek.soltype.bas, skc)
         cbasis = np.array([0 if skc[i] == mosek.stakey.bas else -1 for i in range(self.task.getnumcon())])
-        skx = self.task.getskx()
+        skx = [mosek.stakey.unk] * self.task.getnumvar()
+        self.task.getskx(mosek.soltype.bas, skx)
         vbasis = np.array([0 if skx[i] == mosek.stakey.bas else -1 if skx[i] == mosek.stakey.low else -2 for i in range(self.task.getnumvar())])
         return Basis(vbasis=vbasis, cbasis=cbasis)
 
     def return_x(self) -> np.ndarray:
-        return np.array(self.task.getxx())
+        xx = np.zeros(self.task.getnumvar())
+        self.task.getxx(mosek.soltype.bas, xx)
+        return np.array(xx)
 
     def return_y(self) -> np.ndarray:
-        return np.array(self.task.gety())
+        y = np.zeros(self.task.getnumcon())
+        self.task.gety(mosek.soltype.bas, y)
+        return np.array(y)
 
     def return_barx(self) -> Optional[np.ndarray]:
-        # assert the crossover is off, to be checked.
-        # if mosek.iparam.intpnt_basis is set to mosek.basindtype.never, then return the x
+        # assert the crossover is off,
         if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
-            return self.return_x()
+            xx = np.zeros(self.task.getnumvar())
+            self.task.getxx(mosek.soltype.itr, xx)
+            return np.array(xx)
+        return None
 
     def return_obj_val(self) -> float:
         return self.task.getprimalobj(mosek.soltype.bas)
@@ -122,8 +142,8 @@ class MskCaller(SolverCaller):
     def return_runtime(self) -> datetime.timedelta:
         return datetime.timedelta(seconds=self.task.getdouinf(mosek.dinfitem.optimizer_time))
 
-    def return_iter_count(self) -> float:
-        return self.task.getintinf(mosek.iinfitem.sim_primal_iter + mosek.iinfitem.sim_dual_iter)
+    def return_iter_count(self) -> int:
+        return self.task.getintinf(mosek.iinfitem.sim_primal_iter) + self.task.getintinf(mosek.iinfitem.sim_dual_iter)
 
     def return_bar_iter_count(self) -> int:
         return self.task.getintinf(mosek.iinfitem.intpnt_iter)
@@ -183,7 +203,7 @@ class MskCaller(SolverCaller):
 
     def _set_tol(self) -> None:
         self.task.putdouparam(mosek.dparam.intpnt_tol_rel_gap, self.settings.barrierTol)
-        self.task.putdouparam(mosek.dparam.simplex_tol_rel_gap, self.settings.optimalityTol)
+        self.task.putdouparam(mosek.dparam.simplex_abs_tol_piv, self.settings.optimalityTol)
 
     def _set_presolve(self) -> None:
         # turn off the presolve if setting.presolve is "off"
@@ -193,7 +213,13 @@ class MskCaller(SolverCaller):
             self.task.putintparam(mosek.iparam.presolve_use, mosek.presolvemode.free)
 
     def _set_log(self) -> None:
-        ...
+        self.env.set_Stream(mosek.streamtype.log, _stream_printer)
+        self.task.set_Stream(mosek.streamtype.log, _stream_printer)
 
     def _set_time_limit(self) -> None:
         self.task.putdouparam(mosek.dparam.optimizer_max_time, self.settings.timeLimit)
+
+
+def _stream_printer(text):
+    sys.stdout.write(text)
+    sys.stdout.flush()
