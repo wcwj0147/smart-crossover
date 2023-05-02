@@ -145,7 +145,7 @@ class GrbCaller(SolverCaller):
         if self.settings.presolve == "off":
             self.model.setParam("Presolve", 0)
         else:
-            self.model.setParam("Presolve", 1)
+            self.model.setParam("Presolve", -1)
 
     def _set_tol(self) -> None:
         self.model.setParam("BarConvTol", self.settings.barrierTol)

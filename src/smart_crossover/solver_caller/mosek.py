@@ -99,10 +99,11 @@ class MskCaller(SolverCaller):
 
     def add_warm_start_basis(self,
                              basis: Basis) -> None:
-        skc = np.array([mosek.stakey.bas if basis.vbasis[i] == 0 else mosek.stakey.low for i in range(basis.vbasis.size)])
+        skc = np.array([mosek.stakey.fix if basis.cbasis[i] == -1 else mosek.stakey.bas for i in range(basis.cbasis.size)])
         skx = np.array([mosek.stakey.low if basis.vbasis[i] == -1 else mosek.stakey.upr if basis.vbasis[i] == -2 else mosek.stakey.bas for i in range(basis.vbasis.size)])
-        self.task.putskc(skc)
-        self.task.putskx(skx)
+        self.task.putskc(mosek.soltype.bas, skc)
+        self.task.putskx(mosek.soltype.bas, skx)
+        self.task.putintparam(mosek.iparam.sim_hotstart, mosek.simhotstart.free)
 
     def add_warm_start_solution(self,
                                 start_solution: Tuple[np.ndarray, np.ndarray]):

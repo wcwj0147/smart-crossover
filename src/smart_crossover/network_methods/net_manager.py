@@ -132,7 +132,7 @@ class MCFManager(LPManager):
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         """ Solve the sub problem. """
-        method = "network_simplex" if solver == "CPL" else "default"
+        method = "network_simplex" if solver == "CPL" or "MSK" else "default"
         return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['free']], self.basis.cbasis), presolve=solver_settings.presolve)
 
 
