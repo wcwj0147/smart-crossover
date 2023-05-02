@@ -54,22 +54,27 @@ def solve_mcf(mcf: MinCostFlow,
               solver: str = "GRB",
               method: str = "default",
               presolve: str = "on",
+              crossover: str = 'on',
               optimalityTol: float = 1e-6,
               barrierTol: float = 1e-8,
               warm_start_basis: Optional[Basis] = None) -> Output:
     solver_settings = SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol)
     solver_caller = generate_solver_caller(solver, solver_settings)
     solver_caller.read_mcf(mcf)
-    if method == "default":
+    if method == "barrier":
+        if crossover == 'on':
+            solver_caller.run_barrier()
+        else:
+            solver_caller.run_barrier_no_crossover()
+    else:
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        solver_caller.run_default()
-    elif method == "barrier":
-        solver_caller.run_barrier()
-    elif method == "network_simplex":
-        solver_caller.run_network_simplex()
-    else:
-        raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
+        if method == "default":
+            solver_caller.run_default()
+        elif method == "network_simplex":
+            solver_caller.run_network_simplex()
+        else:
+            raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
 
     return solver_caller.return_output()
 
@@ -78,6 +83,7 @@ def solve_ot(ot: OptTransport,
              solver: str = "GRB",
              method: str = "default",
              presolve: str = "on",
+             crossover: str = 'on',
              optimalityTol: float = 1e-6,
              barrierTol: float = 1e-8,
              warm_start_basis: Optional[Basis] = None) -> Output:
@@ -85,15 +91,19 @@ def solve_ot(ot: OptTransport,
     solver_caller = generate_solver_caller(solver, solver_settings)
     solver_caller.read_ot(ot)
 
-    if method == "default":
+    if method == "barrier":
+        if crossover == 'on':
+            solver_caller.run_barrier()
+        else:
+            solver_caller.run_barrier_no_crossover()
+    else:
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        solver_caller.run_default()
-    elif method == "barrier":
-        solver_caller.run_barrier()
-    elif method == "network_simplex":
-        solver_caller.run_network_simplex()
-    else:
-        raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
+        if method == "default":
+            solver_caller.run_default()
+        elif method == "network_simplex":
+            solver_caller.run_network_simplex()
+        else:
+            raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
 
     return solver_caller.return_output()
