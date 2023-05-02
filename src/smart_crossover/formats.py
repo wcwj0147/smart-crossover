@@ -14,12 +14,12 @@ class StandardLP:
                    l <= x <= u
     """
 
-    A: Optional[Union[sp.csr_matrix, np.ndarray]] = None
-    b: Optional[np.ndarray] = None
-    c: Optional[np.ndarray] = None
-    l: Optional[np.ndarray] = None  # Entries of l can only be 0 or -inf (free variables).
-    u: Optional[np.ndarray] = None
+    A: Union[sp.csr_matrix, np.ndarray]
+    b: np.ndarray
+    c: np.ndarray
+    u: np.ndarray
     name: str = "lp_instance"
+    l: Optional[np.ndarray] = None  # Entries of l can only be 0 or -inf (free variables).
 
     def __post_init__(self) -> None:
         if self.l is None:
