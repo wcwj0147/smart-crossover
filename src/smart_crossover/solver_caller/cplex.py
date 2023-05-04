@@ -177,6 +177,10 @@ class CplCaller(SolverCaller):
         self.model.parameters.lpmethod.set(self.model.parameters.lpmethod.values.network)
         self._run()
 
+    def run_simplex(self) -> None:
+        self.model.parameters.lpmethod.set(self.model.parameters.lpmethod.values.auto)
+        self._run()
+
     def reset_model(self) -> None:
         """Reset the model to the original state."""
         self.model = cplex.Cplex()

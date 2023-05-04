@@ -34,12 +34,15 @@ def solve_lp(lp: StandardLP,
              warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
     solver_caller = generate_solver_caller(solver, SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol))
     solver_caller.read_lp(lp)
-    if method == "default":
+    if method == "default" or method == "simplex":
         if warm_start_solution is not None:
             solver_caller.add_warm_start_solution(warm_start_solution)
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        solver_caller.run_default()
+        if method == "simplex" and solver == "MSK":
+            solver_caller.run_simplex()
+        else:
+            solver_caller.run_default()
     elif method == "barrier":
         if crossover == 'on':
             solver_caller.run_barrier()

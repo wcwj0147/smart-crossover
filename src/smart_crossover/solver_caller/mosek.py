@@ -133,8 +133,8 @@ class MskCaller(SolverCaller):
 
     def add_warm_start_solution(self,
                                 start_solution: Tuple[np.ndarray, np.ndarray]):
-        self.task.putxx(mosek.soltype.itr, start_solution[0])
-        self.task.puty(mosek.soltype.itr, start_solution[1])
+        self.task.putxx(mosek.soltype.bas, start_solution[0])
+        self.task.puty(mosek.soltype.bas, start_solution[1])
         self.task.putintparam(mosek.iparam.sim_hotstart, mosek.simhotstart.free)
 
     def return_basis(self) -> Optional[Basis]:
@@ -224,6 +224,10 @@ class MskCaller(SolverCaller):
     def run_network_simplex(self) -> None:
         """Run simplex/network simplex algorithm on the current model."""
         # NOTE: Mosek has no network simplex algorithm, so we use the general simplex algorithm instead.
+        self.run_simplex()
+
+    def run_simplex(self) -> None:
+        """Run simplex algorithm on the current model."""
         self.task.putintparam(mosek.iparam.optimizer, mosek.optimizertype.free_simplex)
         self._run()
 

@@ -58,8 +58,8 @@ def get_perturb_problem(lp: StandardLP,
 
     """
     BETA = 1e-2
-    lp.c = perturb_c(lp, x)
-    subLP_manager = LPManager(lp)
+    c_perturbed = perturb_c(lp, x)
+    subLP_manager = LPManager(StandardLP(A=lp.A, b=lp.b, c=c_perturbed, l=lp.l, u=lp.u))
     subLP_manager.fix_variables(ind_fix_to_low=np.where(x < BETA * s)[0],
                                 ind_fix_to_up=np.where(lp.u - x < BETA * -s)[0])
     subLP_manager.update_subproblem()
@@ -87,8 +87,9 @@ def run_perturb_algorithm(lp: StandardLP,
         return lp.c - lp.A.transpose() @ barrier_output.y
 
     perturbLP_manager = get_perturb_problem(lp, barrier_output.x, get_dual_slack())
-    perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, method='barrier', solver=solver, barrierTol=barrierTol, presolve="off")
-    final_output = solve_lp(lp, solver, presolve="off", method='default',
+    perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, method='barrier', solver=solver, barrierTol=barrierTol,
+                                      presolve="on")
+    final_output = solve_lp(lp, solver, presolve="off", method='simplex',
                             optimalityTol=optimalityTol,
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y))

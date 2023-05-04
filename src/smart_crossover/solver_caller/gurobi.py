@@ -22,8 +22,7 @@ class GrbCaller(SolverCaller):
         self.settings = solver_settings
 
     def read_model_from_file(self, path: str) -> None:
-        model = gurobipy.read(path)
-        self.read_model(model)
+        self.model = gurobipy.read(path)
 
     def read_mcf(self, mcf: MinCostFlow) -> None:
         model = gurobipy.Model()
@@ -91,6 +90,9 @@ class GrbCaller(SolverCaller):
     def run_default(self) -> None:
         self.model.setParam("Method", -1)
         self._run()
+
+    def run_simplex(self) -> None:
+        self.model.setParam("Method", -1)
 
     def run_primal_simplex(self) -> None:
         self.model.setParam("Method", 0)
