@@ -121,12 +121,18 @@ class MskCaller(SolverCaller):
 
     def return_x(self) -> np.ndarray:
         xx = np.zeros(self.task.getnumvar())
-        self.task.getxx(mosek.soltype.bas, xx)
+        if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
+            self.task.getxx(mosek.soltype.itr, xx)
+        else:
+            self.task.getxx(mosek.soltype.bas, xx)
         return np.array(xx)
 
     def return_y(self) -> np.ndarray:
         y = np.zeros(self.task.getnumcon())
-        self.task.gety(mosek.soltype.bas, y)
+        if self.task.getintparam(mosek.iparam.intpnt_basis == mosek.basindtype.never):
+            self.task.gety(mosek.soltype.itr, y)
+        else:
+            self.task.gety(mosek.soltype.bas, y)
         return np.array(y)
 
     def return_barx(self) -> Optional[np.ndarray]:
