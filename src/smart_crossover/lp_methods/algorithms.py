@@ -81,14 +81,14 @@ def run_perturb_algorithm(lp: StandardLP,
     Returns:
 
     """
-    barrier_output = solve_lp(lp, solver, method='barrier', barrierTol=barrierTol, presolve=0, crossover='off')
+    barrier_output = solve_lp(lp, solver, method='barrier', barrierTol=barrierTol, presolve='off', crossover='off')
 
     def get_dual_slack() -> np.ndarray:
         return lp.c - lp.A.transpose() @ barrier_output.y
 
     perturbLP_manager = get_perturb_problem(lp, barrier_output.x, get_dual_slack())
     perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, method='barrier', solver=solver, barrierTol=barrierTol, presolve="off")
-    final_output = solve_lp(lp, solver, presolve="off",
+    final_output = solve_lp(lp, solver, presolve="off", method='default',
                             optimalityTol=optimalityTol,
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y))

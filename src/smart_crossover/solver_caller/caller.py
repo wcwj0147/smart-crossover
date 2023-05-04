@@ -108,6 +108,7 @@ class SolverCaller(ABC):
                       obj_val=self.return_obj_val(),
                       runtime=self.return_runtime(),
                       iter_count=self.return_iter_count(),
+                      bar_iter_count=self.return_bar_iter_count(),
                       basis=self.return_basis()
                       )
 

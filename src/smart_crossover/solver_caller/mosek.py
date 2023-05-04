@@ -43,7 +43,11 @@ class MskCaller(SolverCaller):
             self.task.putconbound(i, mosek.boundkey.fx, bi, bi)
 
         self.task.putclist(range(num_vars), lp.c)
-        self.task.putvarboundslice(0, num_vars, [mosek.boundkey.ra] * num_vars, [0.0] * num_vars, lp.u)
+
+        var_list_lo = [ind for ind in range(num_vars) if lp.u[ind] == np.inf]
+        var_list_ra = [ind for ind in range(num_vars) if lp.u[ind] != np.inf and lp.l[ind] != -np.inf]
+        self.task.putvarboundlist(var_list_ra, [mosek.boundkey.ra] * len(var_list_ra), [0.0] * len(var_list_ra), lp.u[var_list_ra])
+        self.task.putvarboundlist(var_list_lo, [mosek.boundkey.lo] * len(var_list_lo), [0.0] * len(var_list_lo), [MSK_INF] * len(var_list_lo))
 
         self.task.putobjsense(mosek.objsense.minimize)
 
@@ -70,32 +74,54 @@ class MskCaller(SolverCaller):
         self.task.putobjsense(mosek.objsense.minimize)
 
     def get_A(self) -> sp.csr_matrix:
+        num_con = self.task.getnumcon()
+        num_var = self.task.getnumvar()
         row_indices = []
         col_indices = []
         data = []
-        for i in range(self.task.getnumcon()):
-            asub, aval = self.task.getarow(i)
+
+        for i in range(num_con):
+            asub = [0] * self.task.getarownumnz(i)
+            aval = [0.0] * self.task.getarownumnz(i)
+            nzi = self.task.getarow(i, asub, aval)
+            asub, aval = asub[:nzi], aval[:nzi]
+
             row_indices.extend([i] * len(aval))
             col_indices.extend(asub)
             data.extend(aval)
 
-        A_coo = sp.coo_matrix((data, (row_indices, col_indices)), shape=(self.task.getnumcon(), self.task.getnumvar()))
+        A_coo = sp.coo_matrix((data, (row_indices, col_indices)), shape=(num_con, num_var))
         return A_coo.tocsr()
 
     def get_b(self) -> np.ndarray:
-        return np.array(self.task.getconboundslice(0, self.task.getnumcon())[1])
+        m = self.task.getnumcon()
+        b = np.zeros(m)
+        self.task.getconboundslice(0, m, [mosek.boundkey.fx] * m, b, b)
+        return b
 
     def get_sense(self) -> np.ndarray:
-        return np.array(self.task.getconboundslice(0, self.task.getnumcon())[0])
+        m = self.task.getnumcon()
+        sense = np.array([mosek.boundkey.fx] * m)
+        self.task.getconboundslice(0, m, sense, [0.0]*m, [0.0]*m)
+        return sense
 
     def get_c(self) -> np.ndarray:
-        return np.array(self.task.getclist())
+        num_var = self.task.getnumvar()
+        c = np.zeros(num_var)
+        self.task.getclist(range(num_var), c)
+        return c
 
     def get_l(self) -> np.ndarray:
-        return np.array(self.task.getvarboundslice(0, self.task.getnumvar())[1])
+        num_var = self.task.getnumvar()
+        bk, bl, bu = [0] * num_var, [0.0] * num_var, [0.0] * num_var
+        self.task.getvarboundslice(0, num_var, bk, bl, bu)
+        return np.array(bl)
 
     def get_u(self) -> np.ndarray:
-        return np.array(self.task.getvarboundslice(0, self.task.getnumvar())[2])
+        num_var = self.task.getnumvar()
+        bk, bl, bu = [0] * num_var, [0.0] * num_var, [0.0] * num_var
+        self.task.getvarboundslice(0, num_var, bk, bl, bu)
+        return np.array(bu)
 
     def add_warm_start_basis(self,
                              basis: Basis) -> None:
@@ -107,10 +133,13 @@ class MskCaller(SolverCaller):
 
     def add_warm_start_solution(self,
                                 start_solution: Tuple[np.ndarray, np.ndarray]):
-        self.task.putxx(start_solution[0])
-        self.task.puty(start_solution[1])
+        self.task.putxx(mosek.soltype.itr, start_solution[0])
+        self.task.puty(mosek.soltype.itr, start_solution[1])
+        self.task.putintparam(mosek.iparam.sim_hotstart, mosek.simhotstart.free)
 
     def return_basis(self) -> Optional[Basis]:
+        if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
+            return None
         skc = [mosek.stakey.unk] * self.task.getnumcon()
         self.task.getskc(mosek.soltype.bas, skc)
         cbasis = np.array([0 if skc[i] == mosek.stakey.bas else -1 for i in range(self.task.getnumcon())])
@@ -144,6 +173,8 @@ class MskCaller(SolverCaller):
         return None
 
     def return_obj_val(self) -> float:
+        if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
+            return self.task.getprimalobj(mosek.soltype.itr)
         return self.task.getprimalobj(mosek.soltype.bas)
 
     def return_runtime(self) -> datetime.timedelta:
