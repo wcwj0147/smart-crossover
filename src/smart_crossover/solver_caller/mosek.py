@@ -129,7 +129,7 @@ class MskCaller(SolverCaller):
 
     def return_y(self) -> np.ndarray:
         y = np.zeros(self.task.getnumcon())
-        if self.task.getintparam(mosek.iparam.intpnt_basis == mosek.basindtype.never):
+        if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
             self.task.gety(mosek.soltype.itr, y)
         else:
             self.task.gety(mosek.soltype.bas, y)
