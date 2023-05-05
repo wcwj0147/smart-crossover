@@ -1,4 +1,8 @@
+from typing import Optional
+
 import numpy as np
+import scipy.sparse as sp
+from scipy.sparse.linalg import inv
 
 from smart_crossover.formats import StandardLP
 from smart_crossover.lp_methods.lp_manager import LPManager
@@ -19,42 +23,54 @@ def perturb_c(lp_ori: StandardLP,
         Perturbed cost vector.
 
     """
-    SCALE_FACTOR = 1e-3
+    SCALE_FACTOR_FOR_PERTURBATION = 1e-3
     PERTURB_THRESHOLD = 1e-8
-    PI_OVER_TWO = np.pi / 2
     n = len(x)
 
-    def generate_noise() -> np.ndarray:
-        noise = 1 / 6 * np.random.randn(n, 1) + 1 / 2
-        noise = np.maximum(noise, 0.01)
-        noise = np.minimum(noise, 0.99)
-        return np.squeeze(noise)
-
-    def get_indicators() -> np.ndarray:
-        indicators = np.zeros_like(x, dtype=np.float64)
+    def get_perturbation_vector() -> np.ndarray:
+        perturbation_vector = np.zeros_like(x, dtype=np.float64)
         x_min = np.minimum(x, lp_ori.u - x)
-        indicators[x_min >= PERTURB_THRESHOLD] = np.arctan(1 / x_min[x_min >= PERTURB_THRESHOLD])
-        return indicators
 
-    perturbation = SCALE_FACTOR * generate_noise() * (1 + 99 * get_indicators() / PI_OVER_TWO)
-    c_pt = lp_ori.c + np.abs(perturbation)
+        # Compute the projector P_{X_k^{-1} L}(c) = (I − X_k A^⊤ ^† A X_k) c
+        I = sp.eye(n)
+        X_k = sp.diags(x_min)
+
+        A_X_k = lp_ori.A @ X_k
+        A_X_k2_A_T = A_X_k @ A_X_k.T
+
+        # Compute the Moore-Penrose inverse (A X_k^2 A^⊤)^† using an iterative method for sparse matrices
+        A_X_k2_A_T_inv = inv(A_X_k2_A_T)
+
+        projector = (I - X_k @ lp_ori.A.T @ A_X_k2_A_T_inv @ A_X_k) @ lp_ori.c
+
+        # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
+        perturbation_vector[x_min >= PERTURB_THRESHOLD] = 1 / (x_min[x_min >= PERTURB_THRESHOLD]
+                                                               * np.abs(projector[x_min >= PERTURB_THRESHOLD])
+                                                               * SCALE_FACTOR_FOR_PERTURBATION * n)
+
+        return perturbation_vector
+
+    perturbation = get_perturbation_vector()
+    c_pt = lp_ori.c + perturbation
     return c_pt
 
 
 def get_perturb_problem(lp: StandardLP,
-                        x: np.ndarray,
-                        s: np.ndarray) -> LPManager:
+                        perturb_method: str,
+                        x: Optional[np.ndarray],
+                        s: Optional[np.ndarray]) -> LPManager:
     """
     Find an approximated optimal face using the given interior-point solution. And get the subproblem
     restricted on that optimal face. Use the perturbed objective c_pt.
 
     Args:
         lp: the original LP problem in StandardLP format.
+        perturb_method: the perturbation method (choose from 'random', 'primal', 'dual').
         x: the primal interior-point solution.
         s: the slack of the constraints in the dual LP.
 
     Returns:
-        A subproblem restricted on the approximated optimal face.
+        A LP manager of a sub-problem restricted on the approximated optimal face.
 
     """
     BETA = 1e-2
@@ -67,6 +83,7 @@ def get_perturb_problem(lp: StandardLP,
 
 
 def run_perturb_algorithm(lp: StandardLP,
+                          perturb_method: str,
                           solver: str = "GRB",
                           barrierTol: float = 1e-8,
                           optimalityTol: float = 1e-6) -> Output:
@@ -74,6 +91,7 @@ def run_perturb_algorithm(lp: StandardLP,
 
     Args:
         lp:
+        perturb_method:
         solver:
         barrierTol:
         optimalityTol:
@@ -86,7 +104,7 @@ def run_perturb_algorithm(lp: StandardLP,
     def get_dual_slack() -> np.ndarray:
         return lp.c - lp.A.transpose() @ barrier_output.y
 
-    perturbLP_manager = get_perturb_problem(lp, barrier_output.x, get_dual_slack())
+    perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, get_dual_slack())
     perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, method='barrier', solver=solver, barrierTol=barrierTol,
                                       presolve="on")
     final_output = solve_lp(lp, solver, presolve="off", method='simplex',
