@@ -31,23 +31,25 @@ def perturb_c(lp_ori: StandardLP,
         perturbation_vector = np.zeros_like(x, dtype=np.float64)
         x_min = np.minimum(x, lp_ori.u - x)
 
-        # Compute the projector P_{X_k^{-1} L}(c) = (I − X_k A^⊤ ^† A X_k) c
         I = sp.eye(n)
         X_k = sp.diags(x_min)
 
         A_X_k = lp_ori.A @ X_k
         A_X_k2_A_T = A_X_k @ A_X_k.T
 
-        # Compute the Moore-Penrose inverse (A X_k^2 A^⊤)^† using an iterative method for sparse matrices
         # Compute the SVD using scipy.sparse.svds
-        NUM_SINGULAR_VALUES = 10  # Number of singular values and vectors to compute
-        U, s, Vt = svds(A_X_k2_A_T, k=NUM_SINGULAR_VALUES)
+        NUM_SINGULAR_VALUES = 6
+        SINGULAR_VECTOR_THRESHOlD = 1e-4
+        U, s, V = svds(A_X_k2_A_T, k=NUM_SINGULAR_VALUES)
+        U_sparse = sp.csr_matrix(np.where(np.abs(U) >= SINGULAR_VECTOR_THRESHOlD, U, 0))
+        V_sparse = sp.csr_matrix(np.where(np.abs(U) >= SINGULAR_VECTOR_THRESHOlD, U, 0))
 
         # Compute the approximate Moore-Penrose inverse using the SVD
-        S_inv = np.diag(1 / s)
-        A_X_k2_A_T_inv_approx = Vt.T @ S_inv @ U.T
+        S_inv = sp.diags(1 / s)
+        A_X_k2_A_T_inv_approx = V_sparse @ S_inv @ U_sparse.T
 
-        projector = (I - X_k @ lp_ori.A.T @ A_X_k2_A_T_inv_approx @ A_X_k) @ lp_ori.c
+        # Compute the projector P_{X_k^{-1} L}(c) = (I − X_k A^⊤ ^† A X_k) c
+        projector = (I - A_X_k.T @ A_X_k2_A_T_inv_approx @ A_X_k) @ lp_ori.c
 
         # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
         perturbation_vector[x_min >= PERTURB_THRESHOLD] = 1 / (x_min[x_min >= PERTURB_THRESHOLD]
