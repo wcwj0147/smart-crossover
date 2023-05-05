@@ -51,7 +51,7 @@ class GrbCaller(SolverCaller):
 
     def get_c(self) -> np.ndarray:
         return np.array(self.model.getAttr("obj", self.model.getVars()))
-caller
+
     def get_l(self) -> np.ndarray:
         return np.array(self.model.getAttr("LB", self.model.getVars()))
 
