@@ -75,7 +75,7 @@ class SolverCaller(ABC):
         return MinCostFlow(self.get_A(), self.get_b(), self.get_c(), self.get_u())
 
     def return_StdLP(self) -> StandardLP:
-        return StandardLP(self.get_A(), self.get_b(), self.get_c(), self.get_u())
+        return StandardLP(A=self.get_A(), b=self.get_b(), c=self.get_c(), u=self.get_u())
 
     def return_x(self) -> np.ndarray:
         ...

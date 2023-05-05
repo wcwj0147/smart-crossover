@@ -51,7 +51,7 @@ class GrbCaller(SolverCaller):
 
     def get_c(self) -> np.ndarray:
         return np.array(self.model.getAttr("obj", self.model.getVars()))
-
+caller
     def get_l(self) -> np.ndarray:
         return np.array(self.model.getAttr("LB", self.model.getVars()))
 
@@ -93,6 +93,7 @@ class GrbCaller(SolverCaller):
 
     def run_simplex(self) -> None:
         self.model.setParam("Method", -1)
+        self._run()
 
     def run_primal_simplex(self) -> None:
         self.model.setParam("Method", 0)
