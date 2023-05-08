@@ -36,10 +36,13 @@ class MskCaller(SolverCaller):
         self.task.appendvars(num_vars)
         self.task.appendcons(num_constraints)
 
+        row_indices, col_indices = lp.A.nonzero()
+        values = lp.A.data
+
+        self.task.putaijlist(row_indices, col_indices, values)
+
         for i in range(num_constraints):
-            ai = lp.A.getrow(i).toarray().ravel()
             bi = lp.b[i]
-            self.task.putarow(i, range(num_vars), ai)
             self.task.putconbound(i, mosek.boundkey.fx, bi, bi)
 
         self.task.putclist(range(num_vars), lp.c)

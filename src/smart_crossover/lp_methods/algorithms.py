@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import svds
+from scipy.sparse.linalg import lsqr
 
 from smart_crossover.formats import StandardLP
 from smart_crossover.lp_methods.lp_manager import LPManager
@@ -23,43 +23,44 @@ def perturb_c(lp_ori: StandardLP,
         Perturbed cost vector.
 
     """
-    SCALE_FACTOR_FOR_PERTURBATION = 1e-3
-    PERTURB_THRESHOLD = 1e-8
+    SCALE_FACTOR_FOR_PERTURBATION = 1e-2
+    PERTURB_THRESHOLD = 1e-5
     n = len(x)
 
-    def get_perturbation_vector() -> np.ndarray:
-        perturbation_vector = np.zeros_like(x, dtype=np.float64)
-        x_min = np.minimum(x, lp_ori.u - x)
+    def compute_projector(A: sp.csr_matrix, x: np.ndarray, c: np.ndarray) -> np.ndarray:
+        """Compute the projector P_{X^{-1} L}(c) = (I − X A^⊤ (A X^2 A)^† A X) c"""
+        n = len(x)
+        m = A.shape[0]
 
-        I = sp.eye(n)
-        X_k = sp.diags(x_min)
+        X = sp.diags(x)
+        X2 = sp.diags(x ** 2)
 
-        A_X_k = lp_ori.A @ X_k
-        A_X_k2_A_T = A_X_k @ A_X_k.T
+        AT = A.transpose()
+        A_X = A @ X
+        A_X2_AT = A @ X2 @ AT
 
-        # Compute the SVD using scipy.sparse.svds
-        NUM_SINGULAR_VALUES = 6
-        SINGULAR_VECTOR_THRESHOlD = 1e-4
-        U, s, V = svds(A_X_k2_A_T, k=NUM_SINGULAR_VALUES)
-        U_sparse = sp.csr_matrix(np.where(np.abs(U) >= SINGULAR_VECTOR_THRESHOlD, U, 0))
-        V_sparse = sp.csr_matrix(np.where(np.abs(U) >= SINGULAR_VECTOR_THRESHOlD, U, 0))
+        # Compute temp1 = A X c
+        temp1 = A_X @ c
 
-        # Compute the approximate Moore-Penrose inverse using the SVD
-        S_inv = sp.diags(1 / s)
-        A_X_k2_A_T_inv_approx = V_sparse @ S_inv @ U_sparse.T
+        # Solve the linear least-squares problem using lsqr
+        solution = lsqr(A=A_X2_AT, b=temp1, atol=1e-6, btol=1e-6, iter_lim=1000, show=False)
+        y = solution[0]
 
-        # Compute the projector P_{X_k^{-1} L}(c) = (I − X_k A^⊤ ^† A X_k) c
-        projector = (I - A_X_k.T @ A_X_k2_A_T_inv_approx @ A_X_k) @ lp_ori.c
+        # Compute the final result
+        temp2 = AT @ y
+        result = c - X @ temp2
 
-        # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
-        perturbation_vector[x_min >= PERTURB_THRESHOLD] = 1 / (x_min[x_min >= PERTURB_THRESHOLD]
-                                                               * np.abs(projector[x_min >= PERTURB_THRESHOLD])
-                                                               * SCALE_FACTOR_FOR_PERTURBATION * n)
+        return result
 
-        return perturbation_vector
+    perturbation_vector = np.zeros_like(x, dtype=np.float64)
+    x_min = np.minimum(x, lp_ori.u - x)
+    projector = compute_projector(lp_ori.A, x_min, lp_ori.c)
 
-    perturbation = get_perturbation_vector()
-    c_pt = lp_ori.c + perturbation
+    # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
+    denominator = x_min * np.abs(projector) * SCALE_FACTOR_FOR_PERTURBATION * n
+    perturbation_vector[denominator > PERTURB_THRESHOLD] = 1 / denominator[denominator > PERTURB_THRESHOLD]
+
+    c_pt = lp_ori.c + perturbation_vector
     return c_pt
 
 
