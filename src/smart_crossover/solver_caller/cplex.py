@@ -5,7 +5,7 @@ import cplex
 import numpy as np
 import scipy.sparse as sp
 
-from smart_crossover.formats import MinCostFlow, StandardLP
+from smart_crossover.formats import MinCostFlow, StandardLP, GeneralLP
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
@@ -20,40 +20,45 @@ class CplCaller(SolverCaller):
     def read_model_from_file(self, path: str) -> None:
         self.model.read(path)
 
-    def read_Stdlp(self, lp: StandardLP) -> None:
+    def read_stdlp(self, stdlp: StandardLP) -> None:
         # Add variables
-        self.model.variables.add(obj=lp.c.tolist(), ub=lp.u.tolist(), names=['x_{}'.format(i) for i in range(lp.c.size)])
+        stdlp.A = stdlp.A.tocsr()
+        self.model.variables.add(obj=stdlp.c.tolist(), ub=stdlp.u.tolist(), names=['x_{}'.format(i) for i in range(stdlp.c.size)])
 
         # Precompute variable names
-        var_names = ['x_{}'.format(i) for i in range(lp.A.shape[1])]
-        constraint_names = ['Ax_{}'.format(i) for i in range(lp.A.shape[0])]
-        nonzero_ind = [lp.A.indices[lp.A.indptr[i]:lp.A.indptr[i + 1]] for i in range(lp.A.shape[0])]
+        var_names = ['x_{}'.format(i) for i in range(stdlp.A.shape[1])]
+        constraint_names = ['Ax_{}'.format(i) for i in range(stdlp.A.shape[0])]
+        nonzero_ind = [stdlp.A.indices[stdlp.A.indptr[i]:stdlp.A.indptr[i + 1]] for i in range(stdlp.A.shape[0])]
 
         # Add constraints
         self.model.linear_constraints.add(
             lin_expr=[
-                cplex.SparsePair(ind=[var_names[j] for j in nonzero_ind[i]], val=[lp.A[i, j] for j in nonzero_ind[i]])
-                for i in range(lp.A.shape[0])],
-            senses=['E' for _ in range(lp.A.shape[0])],
-            rhs=lp.b,
+                cplex.SparsePair(ind=[var_names[j] for j in nonzero_ind[i]], val=[stdlp.A[i, j] for j in nonzero_ind[i]])
+                for i in range(stdlp.A.shape[0])],
+            senses=['E' for _ in range(stdlp.A.shape[0])],
+            rhs=stdlp.b,
             names=constraint_names
         )
 
     def read_mcf(self, mcf: MinCostFlow) -> None:
-        # Add variables
-        mcf.A = mcf.A.tocsr()
-        self.model.variables.add(obj=mcf.c.tolist(), ub=mcf.u.tolist(), names=['x_{}'.format(i) for i in range(mcf.c.size)])
+        self.read_stdlp(mcf)
+
+    def read_genlp(self, genlp: GeneralLP) -> None:
+        genlp.A = genlp.A.tocsr()
+        self.model.variables.add(obj=genlp.c.tolist(), ub=genlp.u.tolist(), lb=genlp.l.tolist(), names=['x_{}'.format(i) for i in range(genlp.c.size)])
 
         # Precompute variable names
-        var_names = ['x_{}'.format(i) for i in range(mcf.A.shape[1])]
-        constraint_names = ['Ax_{}'.format(i) for i in range(mcf.A.shape[0])]
-        nonzero_ind = [mcf.A.indices[mcf.A.indptr[i]:mcf.A.indptr[i + 1]] for i in range(mcf.A.shape[0])]
+        var_names = ['x_{}'.format(i) for i in range(genlp.A.shape[1])]
+        constraint_names = ['Ax_{}'.format(i) for i in range(genlp.A.shape[0])]
+        nonzero_ind = [genlp.A.indices[genlp.A.indptr[i]:genlp.A.indptr[i + 1]] for i in range(genlp.A.shape[0])]
 
         # Add constraints
         self.model.linear_constraints.add(
-            lin_expr=[cplex.SparsePair(ind=[var_names[j] for j in nonzero_ind[i]], val=[mcf.A[i, j] for j in nonzero_ind[i]]) for i in range(mcf.A.shape[0])],
-            senses=['E' for _ in range(mcf.A.shape[0])],
-            rhs=mcf.b,
+            lin_expr=[
+                cplex.SparsePair(ind=[var_names[j] for j in nonzero_ind[i]], val=[genlp.A[i, j] for j in nonzero_ind[i]])
+                for i in range(genlp.A.shape[0])],
+            senses=['E' if genlp.sense[i] == '=' else 'L' if genlp.sense[i] == '<' else 'G' for i in range(genlp.A.shape[0])],
+            rhs=genlp.b,
             names=constraint_names
         )
 

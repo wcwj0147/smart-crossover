@@ -7,7 +7,7 @@ from gurobipy import GRB
 import numpy as np
 import scipy.sparse as sp
 
-from smart_crossover.formats import MinCostFlow, StandardLP
+from smart_crossover.formats import MinCostFlow, StandardLP, GeneralLP
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
@@ -24,19 +24,23 @@ class GrbCaller(SolverCaller):
     def read_model_from_file(self, path: str) -> None:
         self.model = gurobipy.read(path)
 
-    def read_mcf(self, mcf: MinCostFlow) -> None:
+    def read_stdlp(self, stdlp: StandardLP) -> None:
         model = gurobipy.Model()
-        x = model.addMVar(shape=mcf.c.size, ub=mcf.u, name='x')
-        model.setObjective(mcf.c @ x, GRB.MINIMIZE)
-        model.addMConstr(mcf.A, x, '=', mcf.b, name='Ax')
+        x = model.addMVar(shape=stdlp.c.size, ub=stdlp.u, name='x')
+        model.setObjective(stdlp.c @ x, GRB.MINIMIZE)
+        model.addMConstr(stdlp.A, x, '=', stdlp.b, name='Ax')
         self.model = model
-        self.model.update()  # Let MVar, MConstr info to appear in the model
+        self.model.update()
 
-    def read_Stdlp(self, lp: StandardLP) -> None:
+    def read_mcf(self, mcf: MinCostFlow) -> None:
+        self.read_stdlp(mcf)
+
+    def read_genlp(self, genlp: GeneralLP) -> None:
+        """Read a GeneralLP instance."""
         model = gurobipy.Model()
-        x = model.addMVar(shape=lp.c.size, ub=lp.u, name='x')
-        model.setObjective(lp.c @ x, GRB.MINIMIZE)
-        model.addMConstr(lp.A, x, '=', lp.b, name='Ax')
+        x = model.addMVar(shape=genlp.c.size, lb=genlp.l, ub=genlp.u, name='x')
+        model.setObjective(genlp.c @ x, GRB.MINIMIZE)
+        model.addMConstr(genlp.A, x, genlp.sense, genlp.b, name='Ax')
         self.model = model
         self.model.update()
 

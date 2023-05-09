@@ -10,7 +10,7 @@ import scipy.sparse as sp
 import cplex
 import mosek.fusion as mf
 
-from smart_crossover.formats import MinCostFlow, OptTransport, StandardLP
+from smart_crossover.formats import MinCostFlow, OptTransport, StandardLP, GeneralLP
 from smart_crossover.output import Basis, Output
 
 
@@ -42,7 +42,10 @@ class SolverCaller(ABC):
     def read_ot(self, ot: OptTransport) -> None:
         self.read_mcf(ot.to_MCF())
 
-    def read_Stdlp(self, lp: StandardLP) -> None:
+    def read_stdlp(self, stdlp: StandardLP) -> None:
+        ...
+
+    def read_genlp(self, genlp: GeneralLP) -> None:
         ...
 
     def get_A(self) -> sp.csr_matrix:
@@ -55,6 +58,9 @@ class SolverCaller(ABC):
         ...
 
     def get_c(self) -> np.ndarray:
+        ...
+
+    def get_l(self) -> np.ndarray:
         ...
 
     def get_u(self) -> np.ndarray:
@@ -71,11 +77,14 @@ class SolverCaller(ABC):
     def return_basis(self) -> Basis:
         ...
 
-    def return_MCF(self) -> MinCostFlow:
+    def return_mcf(self) -> MinCostFlow:
         return MinCostFlow(self.get_A(), self.get_b(), self.get_c(), self.get_u())
 
-    def return_StdLP(self) -> StandardLP:
+    def return_stdlp(self) -> StandardLP:
         return StandardLP(A=self.get_A(), b=self.get_b(), c=self.get_c(), u=self.get_u())
+
+    def return_genlp(self) -> GeneralLP:
+        return GeneralLP(A=self.get_A(), b=self.get_b(), c=self.get_c(), l=self.get_l(), u=self.get_u(), sense=self.get_sense())
 
     def return_x(self) -> np.ndarray:
         ...

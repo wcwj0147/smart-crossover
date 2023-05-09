@@ -6,7 +6,7 @@ import numpy as np
 import scipy.sparse as sp
 import mosek
 
-from smart_crossover.formats import MinCostFlow, StandardLP
+from smart_crossover.formats import MinCostFlow, StandardLP, GeneralLP
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
@@ -29,49 +29,55 @@ class MskCaller(SolverCaller):
     def read_model_from_file(self, path: str) -> None:
         self.task.readdata(path)
 
-    def read_Stdlp(self, lp: MinCostFlow) -> None:
-        num_vars = lp.c.size
-        num_constraints = lp.A.shape[0]
+    def read_stdlp(self, stdlp: MinCostFlow) -> None:
+        num_vars = stdlp.c.size
+        num_constraints = stdlp.A.shape[0]
 
         self.task.appendvars(num_vars)
         self.task.appendcons(num_constraints)
 
-        row_indices, col_indices = lp.A.nonzero()
-        values = lp.A.data
+        row_indices, col_indices = stdlp.A.nonzero()
+        values = stdlp.A.data
 
         self.task.putaijlist(row_indices, col_indices, values)
-        self.task.putconboundlist(range(num_constraints), [mosek.boundkey.fx] * num_constraints, lp.b, lp.b)
+        self.task.putconboundlist(range(num_constraints), [mosek.boundkey.fx] * num_constraints, stdlp.b, stdlp.b)
 
-        self.task.putclist(range(num_vars), lp.c)
-
-        var_list_lo = [ind for ind in range(num_vars) if lp.u[ind] == np.inf]
-        var_list_ra = [ind for ind in range(num_vars) if lp.u[ind] != np.inf and lp.l[ind] != -np.inf]
-        self.task.putvarboundlist(var_list_ra, [mosek.boundkey.ra] * len(var_list_ra), [0.0] * len(var_list_ra), lp.u[var_list_ra])
-        self.task.putvarboundlist(var_list_lo, [mosek.boundkey.lo] * len(var_list_lo), [0.0] * len(var_list_lo), [MSK_INF] * len(var_list_lo))
-
+        self.task.putclist(range(num_vars), stdlp.c)
         self.task.putobjsense(mosek.objsense.minimize)
+
+        var_list_lo = [ind for ind in range(num_vars) if stdlp.u[ind] == np.inf]
+        var_list_ra = [ind for ind in range(num_vars) if stdlp.u[ind] != np.inf and stdlp.l[ind] != -np.inf]
+        self.task.putvarboundlist(var_list_ra, [mosek.boundkey.ra] * len(var_list_ra), [0.0] * len(var_list_ra), stdlp.u[var_list_ra])
+        self.task.putvarboundlist(var_list_lo, [mosek.boundkey.lo] * len(var_list_lo), [0.0] * len(var_list_lo), [MSK_INF] * len(var_list_lo))
 
     def read_mcf(self, mcf: MinCostFlow) -> None:
-        num_vars = mcf.c.size
-        num_constraints = mcf.A.shape[0]
+        self.read_stdlp(mcf)
+
+    def read_genlp(self, genlp: GeneralLP) -> None:
+        num_vars = genlp.c.size
+        num_constraints = genlp.A.shape[0]
 
         self.task.appendvars(num_vars)
         self.task.appendcons(num_constraints)
 
-        row_indices, col_indices = mcf.A.nonzero()
-        values = mcf.A.data
+        row_indices, col_indices = genlp.A.nonzero()
+        values = genlp.A.data
 
         self.task.putaijlist(row_indices, col_indices, values)
-        self.task.putconboundlist(range(num_constraints), [mosek.boundkey.fx] * num_constraints, mcf.b, mcf.b)
+        constraints_bound_keys = [mosek.boundkey.fx if sense == '=' else mosek.boundkey.up if sense == '<' else mosek.boundkey.lo for sense in genlp.sense]
+        self.task.putconboundlist(range(num_constraints), constraints_bound_keys, genlp.b, genlp.b)
 
-        self.task.putclist(range(num_vars), mcf.c)
-
-        var_list_lo = [ind for ind in range(num_vars) if mcf.u[ind] == np.inf]
-        var_list_ra = [ind for ind in range(num_vars) if mcf.u[ind] != np.inf and mcf.l[ind] != -np.inf]
-        self.task.putvarboundlist(var_list_ra, [mosek.boundkey.ra] * len(var_list_ra), [0.0] * len(var_list_ra), mcf.u[var_list_ra])
-        self.task.putvarboundlist(var_list_lo, [mosek.boundkey.lo] * len(var_list_lo), [0.0] * len(var_list_lo), [MSK_INF] * len(var_list_lo))
-
+        self.task.putclist(range(num_vars), genlp.c)
         self.task.putobjsense(mosek.objsense.minimize)
+
+        var_list_lo = [ind for ind in range(num_vars) if genlp.u[ind] == np.inf and genlp.l[ind] != -np.inf]
+        var_list_up = [ind for ind in range(num_vars) if genlp.u[ind] != np.inf and genlp.l[ind] == -np.inf]
+        var_list_ra = [ind for ind in range(num_vars) if genlp.u[ind] != np.inf and genlp.l[ind] != -np.inf]
+        var_list_fr = [ind for ind in range(num_vars) if genlp.u[ind] == np.inf and genlp.l[ind] == -np.inf]
+        self.task.putvarboundlist(var_list_ra, [mosek.boundkey.ra] * len(var_list_ra), genlp.l[var_list_ra], genlp.u[var_list_ra])
+        self.task.putvarboundlist(var_list_lo, [mosek.boundkey.lo] * len(var_list_lo), genlp.l[var_list_lo], [MSK_INF] * len(var_list_lo))
+        self.task.putvarboundlist(var_list_up, [mosek.boundkey.up] * len(var_list_up), genlp.l[var_list_lo], genlp.u[var_list_up])
+        self.task.putvarboundlist(var_list_fr, [mosek.boundkey.fr] * len(var_list_fr), [MSK_INF] * len(var_list_lo), [MSK_INF] * len(var_list_lo))
 
     def get_A(self) -> sp.csr_matrix:
         num_con = self.task.getnumcon()

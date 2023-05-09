@@ -28,7 +28,7 @@ class StandardLP:
     Information of a standard form LP model:
              min      c^T x
              s.t.     A x = b
-                   l <= x <= u
+                   0 <= x <= u
     """
 
     A: Union[sp.csr_matrix, np.ndarray]

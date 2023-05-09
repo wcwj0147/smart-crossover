@@ -33,7 +33,7 @@ def solve_lp(lp: StandardLP,
              warm_start_basis: Optional[Basis] = None,
              warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
     solver_caller = generate_solver_caller(solver, SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol))
-    solver_caller.read_Stdlp(lp)
+    solver_caller.read_stdlp(lp)
     if method == "default" or method == "simplex":
         if warm_start_solution is not None:
             solver_caller.add_warm_start_solution(warm_start_solution)
