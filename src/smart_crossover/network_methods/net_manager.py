@@ -61,7 +61,7 @@ class MCFManagerStd():
         self.mcf = mcf
         self.m = self.mcf.b.size
         self.n = self.mcf.c.size
-        self.var_info = {'free': np.array(range(self.n), dtype=np.int64)}
+        self.var_info = {'non_fix': np.array(range(self.n), dtype=np.int64)}
         self.artificial_vars = np.array([])
         self.c_rescaling_factor = None
 
@@ -80,7 +80,7 @@ class MCFManagerStd():
         b_1 = np.concatenate([self.mcf.b, np.array([0])])
         self.mcf = MinCostFlow(A_1, b_1, c_1, u_1)
         self.artificial_vars = np.array(range(self.n, self.n + self.m), dtype=int)
-        self.var_info['free'] = np.append(self.var_info['free'], np.array(range(self.n, self.n + self.m), dtype=np.int64))
+        self.var_info['non_fix'] = np.append(self.var_info['non_fix'], np.array(range(self.n, self.n + self.m), dtype=np.int64))
 
     def get_sorted_flows(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """ Get the sorted flows by calculating flow indicators. """
@@ -118,27 +118,27 @@ class MCFManagerStd():
     def update_subproblem(self) -> None:
         """ Update the sub problem by the information of variables. """
         self.mcf_sub = MinCostFlow(
-            A=self.mcf.A[:, self.var_info['free']],
+            A=self.mcf.A[:, self.var_info['non_fix']],
             b=self.mcf.b - self.mcf.A[:, self.var_info['fix_up']] @ self.mcf.u[self.var_info['fix_up']],
-            c=self.mcf.c[self.var_info['free']],
-            u=self.mcf.u[self.var_info['free']]
+            c=self.mcf.c[self.var_info['non_fix']],
+            u=self.mcf.u[self.var_info['non_fix']]
         )
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         """ Solve the sub problem. """
         method = "network_simplex" if solver == "CPL" or "MSK" else "default"
-        return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['free']], self.basis.cbasis), presolve=solver_settings.presolve)
+        return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['non_fix']], self.basis.cbasis), presolve=solver_settings.presolve)
 
     def fix_variables(self, ind_fix_to_low: np.ndarray, ind_fix_to_up: np.ndarray) -> None:
         """ Fix some variables to lower/upper bounds in the sub problem. """
         self.var_info['fix_low'] = ind_fix_to_low
         self.var_info['fix_up'] = ind_fix_to_up
-        self.var_info['free'] = np.setdiff1d(range(len(self.mcf.c)), np.append(ind_fix_to_low, ind_fix_to_up))
-        self.var_info['fix'] = np.setdiff1d(range(len(self.mcf.c)), self.var_info['free'])
+        self.var_info['non_fix'] = np.setdiff1d(range(len(self.mcf.c)), np.append(ind_fix_to_low, ind_fix_to_up))
+        self.var_info['fix'] = np.setdiff1d(range(len(self.mcf.c)), self.var_info['non_fix'])
 
     def add_free_variables(self, ind_free_new: np.ndarray) -> None:
         """ Add some variables to the free variables in the sub problem. """
-        self.var_info['free'] = np.append(self.var_info['free'], ind_free_new)
+        self.var_info['non_fix'] = np.append(self.var_info['non_fix'], ind_free_new)
         self.var_info['fix'] = np.setdiff1d(self.var_info['fix'], ind_free_new)
         self.var_info['fix_low'] = np.setdiff1d(self.var_info['fix_low'], ind_free_new)
         self.var_info['fix_up'] = np.setdiff1d(self.var_info['fix_up'], ind_free_new)
@@ -146,7 +146,7 @@ class MCFManagerStd():
     def recover_basis_from_sub_basis(self, basis_sub: Basis) -> Basis:
         """ Recover the basis of the current LP from a basis of the sub problem. """
         vbasis = -np.ones(self.mcf.c.size, dtype=int)
-        vbasis[self.var_info['free']] = basis_sub.vbasis
+        vbasis[self.var_info['non_fix']] = basis_sub.vbasis
         vbasis[self.var_info['fix_up']] = -2
         cbasis = basis_sub.cbasis
         return Basis(vbasis, cbasis)
