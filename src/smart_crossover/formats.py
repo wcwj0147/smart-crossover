@@ -6,6 +6,23 @@ import scipy.sparse as sp
 
 
 @dataclass
+class GeneralLP:
+    """
+    Information of a Gurobi presolved LP model:
+                min      c^T x
+                s.t.     A x (sense) b
+                        l <= x <= u
+    """
+    A: Union[sp.csr_matrix, np.ndarray]
+    b: np.ndarray
+    c: np.ndarray
+    l: np.ndarray
+    u: np.ndarray
+    sense: np.ndarray
+    name: str = "lp_instance"
+
+
+@dataclass
 class StandardLP:
     """
     Information of a standard form LP model:

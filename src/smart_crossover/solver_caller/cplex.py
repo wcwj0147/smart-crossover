@@ -20,7 +20,7 @@ class CplCaller(SolverCaller):
     def read_model_from_file(self, path: str) -> None:
         self.model.read(path)
 
-    def read_lp(self, lp: StandardLP) -> None:
+    def read_Stdlp(self, lp: StandardLP) -> None:
         # Add variables
         self.model.variables.add(obj=lp.c.tolist(), ub=lp.u.tolist(), names=['x_{}'.format(i) for i in range(lp.c.size)])
 

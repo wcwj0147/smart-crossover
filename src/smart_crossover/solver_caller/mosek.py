@@ -29,7 +29,7 @@ class MskCaller(SolverCaller):
     def read_model_from_file(self, path: str) -> None:
         self.task.readdata(path)
 
-    def read_lp(self, lp: MinCostFlow) -> None:
+    def read_Stdlp(self, lp: MinCostFlow) -> None:
         num_vars = lp.c.size
         num_constraints = lp.A.shape[0]
 
@@ -40,10 +40,7 @@ class MskCaller(SolverCaller):
         values = lp.A.data
 
         self.task.putaijlist(row_indices, col_indices, values)
-
-        for i in range(num_constraints):
-            bi = lp.b[i]
-            self.task.putconbound(i, mosek.boundkey.fx, bi, bi)
+        self.task.putconboundlist(range(num_constraints), [mosek.boundkey.fx] * num_constraints, lp.b, lp.b)
 
         self.task.putclist(range(num_vars), lp.c)
 
@@ -65,10 +62,7 @@ class MskCaller(SolverCaller):
         values = mcf.A.data
 
         self.task.putaijlist(row_indices, col_indices, values)
-
-        for i in range(num_constraints):
-            bi = mcf.b[i]
-            self.task.putconbound(i, mosek.boundkey.fx, bi, bi)
+        self.task.putconboundlist(range(num_constraints), [mosek.boundkey.fx] * num_constraints, mcf.b, mcf.b)
 
         self.task.putclist(range(num_vars), mcf.c)
 

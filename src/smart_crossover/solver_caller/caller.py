@@ -42,7 +42,7 @@ class SolverCaller(ABC):
     def read_ot(self, ot: OptTransport) -> None:
         self.read_mcf(ot.to_MCF())
 
-    def read_lp(self, lp: StandardLP) -> None:
+    def read_Stdlp(self, lp: StandardLP) -> None:
         ...
 
     def get_A(self) -> sp.csr_matrix:

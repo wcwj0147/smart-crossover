@@ -32,7 +32,7 @@ class GrbCaller(SolverCaller):
         self.model = model
         self.model.update()  # Let MVar, MConstr info to appear in the model
 
-    def read_lp(self, lp: StandardLP) -> None:
+    def read_Stdlp(self, lp: StandardLP) -> None:
         model = gurobipy.Model()
         x = model.addMVar(shape=lp.c.size, ub=lp.u, name='x')
         model.setObjective(lp.c @ x, GRB.MINIMIZE)
