@@ -118,7 +118,8 @@ def run_perturb_algorithm(lp: GeneralLP,
     final_output = solve_lp(lp, solver, presolve="off", method='simplex',
                             optimalityTol=optimalityTol,
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
-                                                 perturb_barrier_output.y))
+                                                 perturb_barrier_output.y),
+                            warm_start_basis=perturbLP_manager.recover_basis_from_sub_basis(perturb_barrier_output.basis))
     return Output(x=final_output.x,
                   y=final_output.y,
                   obj_val=final_output.obj_val,

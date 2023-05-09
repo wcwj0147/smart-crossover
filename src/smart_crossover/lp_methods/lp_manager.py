@@ -57,3 +57,11 @@ class LPManager:
         x[self.var_info['non_fix']] = x_sub
         x[self.var_info['fix_up']] = self.lp.u[self.var_info['fix_up']]
         return x
+
+    def recover_basis_from_sub_basis(self, basis_sub: Basis) -> Basis:
+        """ Recover the basis of the current LP from a basis of the sub problem. """
+        vbasis = -np.ones(self.lp.c.size, dtype=int)
+        vbasis[self.var_info['non_fix']] = basis_sub.vbasis
+        vbasis[self.var_info['fix_up']] = -2
+        cbasis = basis_sub.cbasis
+        return Basis(vbasis, cbasis)
