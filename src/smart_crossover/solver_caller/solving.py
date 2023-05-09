@@ -1,8 +1,8 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 
-from smart_crossover.formats import StandardLP, MinCostFlow, OptTransport
+from smart_crossover.formats import StandardLP, MinCostFlow, OptTransport, GeneralLP
 from smart_crossover.output import Output, Basis
 from smart_crossover.solver_caller.caller import SolverSettings, SolverCaller
 from smart_crossover.solver_caller.cplex import CplCaller
@@ -23,7 +23,7 @@ def generate_solver_caller(solver: str = "GRB",
     return caller
 
 
-def solve_lp(lp: StandardLP,
+def solve_lp(lp: Union[GeneralLP, StandardLP],
              solver: str = "GRB",
              method: str = "default",
              optimalityTol: float = 1e-6,
@@ -33,7 +33,13 @@ def solve_lp(lp: StandardLP,
              warm_start_basis: Optional[Basis] = None,
              warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
     solver_caller = generate_solver_caller(solver, SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol))
-    solver_caller.read_stdlp(lp)
+    if isinstance(lp, StandardLP):
+        solver_caller.read_stdlp(lp)
+    elif isinstance(lp, GeneralLP):
+        solver_caller.read_genlp(lp)
+    else:
+        raise ValueError("Invalid LP format.")
+
     if method == "default" or method == "simplex":
         if warm_start_solution is not None:
             solver_caller.add_warm_start_solution(warm_start_solution)

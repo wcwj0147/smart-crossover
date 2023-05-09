@@ -4,8 +4,7 @@ from typing_extensions import Protocol
 import numpy as np
 from scipy import sparse as sp
 
-from smart_crossover.formats import MinCostFlow, StandardLP, OptTransport
-from smart_crossover.lp_methods.lp_manager import LPManager
+from smart_crossover.formats import MinCostFlow, OptTransport
 from smart_crossover.output import Basis, Output
 from smart_crossover.parameters import TOLERANCE_FOR_ARTIFICIAL_VARS, TOLERANCE_FOR_REDUCED_COSTS
 from smart_crossover.solver_caller.caller import SolverSettings
@@ -47,7 +46,7 @@ class NetworkManager(Protocol):
         ...
 
 
-class MCFManager(LPManager):
+class MCFManagerStd():
     """A class to manage the MCF problem and its subproblem in network crossover algorithms.
 
     Attributes:
@@ -59,30 +58,12 @@ class MCFManager(LPManager):
     mcf: MinCostFlow
 
     def __init__(self, mcf: MinCostFlow) -> None:
-        super().__init__(mcf)
         self.mcf = mcf
-
-    @property
-    def lp(self) -> StandardLP:
-        return self.mcf
-
-    @lp.setter
-    def lp(self, value: StandardLP) -> None:
-        if isinstance(value, MinCostFlow):
-            self.mcf = value
-        else:
-            raise ValueError("Expected a MinCostFlow instance")
-
-    @property
-    def lp_sub(self) -> StandardLP:
-        return self.mcf_sub
-
-    @lp_sub.setter
-    def lp_sub(self, value: StandardLP) -> None:
-        if isinstance(value, MinCostFlow):
-            self.mcf_sub = value
-        else:
-            raise ValueError("Expected a MinCostFlow instance")
+        self.m = self.mcf.b.size
+        self.n = self.mcf.c.size
+        self.var_info = {'free': np.array(range(self.n), dtype=np.int64)}
+        self.artificial_vars = np.array([])
+        self.c_rescaling_factor = None
 
     def extend_by_bigM(self, bigM: float) -> None:
         """ Extend the MCF problem by the bigM method. """
@@ -130,10 +111,67 @@ class MCFManager(LPManager):
         cbasis = np.concatenate([-np.ones(self.m), np.zeros(1)])
         self.set_basis(Basis(vbasis, cbasis))
 
+    def set_basis(self, basis: Basis) -> None:
+        """ Add a feasible basis for the current LP. """
+        self.basis = basis
+
+    def update_subproblem(self) -> None:
+        """ Update the sub problem by the information of variables. """
+        self.mcf_sub = MinCostFlow(
+            A=self.mcf.A[:, self.var_info['free']],
+            b=self.mcf.b - self.mcf.A[:, self.var_info['fix_up']] @ self.mcf.u[self.var_info['fix_up']],
+            c=self.mcf.c[self.var_info['free']],
+            u=self.mcf.u[self.var_info['free']]
+        )
+
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         """ Solve the sub problem. """
         method = "network_simplex" if solver == "CPL" or "MSK" else "default"
         return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['free']], self.basis.cbasis), presolve=solver_settings.presolve)
+
+    def fix_variables(self, ind_fix_to_low: np.ndarray, ind_fix_to_up: np.ndarray) -> None:
+        """ Fix some variables to lower/upper bounds in the sub problem. """
+        self.var_info['fix_low'] = ind_fix_to_low
+        self.var_info['fix_up'] = ind_fix_to_up
+        self.var_info['free'] = np.setdiff1d(range(len(self.mcf.c)), np.append(ind_fix_to_low, ind_fix_to_up))
+        self.var_info['fix'] = np.setdiff1d(range(len(self.mcf.c)), self.var_info['free'])
+
+    def add_free_variables(self, ind_free_new: np.ndarray) -> None:
+        """ Add some variables to the free variables in the sub problem. """
+        self.var_info['free'] = np.append(self.var_info['free'], ind_free_new)
+        self.var_info['fix'] = np.setdiff1d(self.var_info['fix'], ind_free_new)
+        self.var_info['fix_low'] = np.setdiff1d(self.var_info['fix_low'], ind_free_new)
+        self.var_info['fix_up'] = np.setdiff1d(self.var_info['fix_up'], ind_free_new)
+
+    def recover_basis_from_sub_basis(self, basis_sub: Basis) -> Basis:
+        """ Recover the basis of the current LP from a basis of the sub problem. """
+        vbasis = -np.ones(self.mcf.c.size, dtype=int)
+        vbasis[self.var_info['free']] = basis_sub.vbasis
+        vbasis[self.var_info['fix_up']] = -2
+        cbasis = basis_sub.cbasis
+        return Basis(vbasis, cbasis)
+
+    def rescale_cost(self, factor: float) -> None:
+        """ Rescale the objective function of the current LP. """
+        self.mcf.c = self.mcf.c / factor
+        self.c_rescaling_factor = factor
+
+    def recover_obj_val(self, obj_val: float) -> float:
+        """ Recover the objective value of the original LP from the objective value of the current LP. """
+        return obj_val * self.c_rescaling_factor
+
+    def get_reduced_cost_for_original_mcf(self, y: np.ndarray) -> np.ndarray:
+        """ Get the reduced cost for the current LP. """
+        rcost = self.mcf.c - self.mcf.A.T @ y
+        rcost[self.basis.vbasis == -2] = -rcost[self.basis.vbasis == -2]
+        return rcost
+
+    def check_optimality_condition(self, x: np.ndarray, y: np.ndarray) -> bool:
+        """ Check the optimality condition for the current LP and a pair of primal-dual solution (x, y). """
+        artificial_vars_condition = np.all(
+            x[self.artificial_vars] < TOLERANCE_FOR_ARTIFICIAL_VARS) if self.artificial_vars.size > 0 else True
+        rcost_condition = np.all(self.get_reduced_cost_for_original_mcf(y) >= -TOLERANCE_FOR_REDUCED_COSTS)
+        return artificial_vars_condition and rcost_condition
 
 
 class OTManager:

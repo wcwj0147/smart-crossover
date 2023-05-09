@@ -84,7 +84,9 @@ class CplCaller(SolverCaller):
         return np.array(self.model.linear_constraints.get_rhs())
 
     def get_sense(self) -> np.ndarray:
-        return np.array(self.model.linear_constraints.get_senses())
+        sense = np.array(self.model.linear_constraints.get_senses())
+        sense = np.array(['=' if s == 'E' else '<' if s == 'L' else '>' for s in sense])
+        return sense
 
     def get_c(self) -> np.ndarray:
         return np.array(self.model.objective.get_linear())

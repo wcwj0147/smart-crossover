@@ -109,6 +109,7 @@ class MskCaller(SolverCaller):
         m = self.task.getnumcon()
         sense = np.array([mosek.boundkey.fx] * m)
         self.task.getconboundslice(0, m, sense, [0.0]*m, [0.0]*m)
+        sense = np.array(['=' if s == mosek.boundkey.fx else '<' if s == mosek.boundkey.up else '>' for s in sense])
         return sense
 
     def get_c(self) -> np.ndarray:

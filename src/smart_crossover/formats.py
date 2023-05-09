@@ -21,6 +21,27 @@ class GeneralLP:
     sense: np.ndarray
     name: str = "lp_instance"
 
+    def get_free_variables(self) -> np.ndarray:
+        return np.where(np.logical_and(self.l == -np.inf, self.u == np.inf))[0]
+
+    def get_standard_A(self) -> sp.csr_matrix:
+        """ Added slack variables to the original A matrix, such that the LP can be transfered in the form A_new x = b. """
+        assert np.all(np.logical_or(self.sense == '=', self.sense == '<'))
+        m, n = self.A.shape
+        A_new = sp.hstack([self.A, sp.eye(m, format="csr")[:, np.where(self.sense == "<")[0]]])
+        return A_new
+
+    def get_standard_c(self) -> np.ndarray:
+        return self.get_standard_var_vector(self.c)
+
+    def get_standard_var_vector(self, var_vector: np.ndarray) -> np.ndarray:
+        """ Added slack variables to the original variable vector, which may represent a cost vector or a solution vector."""
+        assert np.all(np.logical_or(self.sense == '=', self.sense == '<'))
+        return np.hstack([var_vector, np.zeros(np.sum(self.sense == "<"))])
+
+    def recover_standard_var_vector(self, var_vector_std: np.ndarray) -> np.ndarray:
+        return var_vector_std[:self.c.size]
+
 
 @dataclass
 class StandardLP:

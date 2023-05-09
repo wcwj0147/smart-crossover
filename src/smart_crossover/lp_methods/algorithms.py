@@ -4,13 +4,13 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import lsqr
 
-from smart_crossover.formats import StandardLP
+from smart_crossover.formats import StandardLP, GeneralLP
 from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Output
 from smart_crossover.solver_caller.solving import solve_lp
 
 
-def perturb_c(lp_ori: StandardLP,
+def perturb_c(lp_ori: GeneralLP,
               x: np.ndarray) -> np.ndarray:
     """
     Perturb the input array `c` based on the interior-point solution `x`.
@@ -29,9 +29,6 @@ def perturb_c(lp_ori: StandardLP,
 
     def compute_projector(A: sp.csr_matrix, x: np.ndarray, c: np.ndarray) -> np.ndarray:
         """Compute the projector P_{X^{-1} L}(c) = (I − X A^⊤ (A X^2 A)^† A X) c"""
-        n = len(x)
-        m = A.shape[0]
-
         X = sp.diags(x)
         X2 = sp.diags(x ** 2)
 
@@ -53,8 +50,10 @@ def perturb_c(lp_ori: StandardLP,
         return result
 
     perturbation_vector = np.zeros_like(x, dtype=np.float64)
-    x_min = np.minimum(x, lp_ori.u - x)
-    projector = compute_projector(lp_ori.A, x_min, lp_ori.c)
+    x_min = np.minimum(x - lp_ori.l, lp_ori.u - x)
+    # Transfer to standard form temporarily to calculate the projector.
+    projector_extend = compute_projector(lp_ori.get_standard_A(), lp_ori.get_standard_var_vector(x_min), lp_ori.get_standard_c())
+    projector = lp_ori.recover_standard_var_vector(projector_extend)
 
     # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
     denominator = x_min * np.abs(projector) * SCALE_FACTOR_FOR_PERTURBATION * n
@@ -64,7 +63,7 @@ def perturb_c(lp_ori: StandardLP,
     return c_pt
 
 
-def get_perturb_problem(lp: StandardLP,
+def get_perturb_problem(lp: GeneralLP,
                         perturb_method: str,
                         x: Optional[np.ndarray],
                         s: Optional[np.ndarray]) -> LPManager:
@@ -84,14 +83,14 @@ def get_perturb_problem(lp: StandardLP,
     """
     BETA = 1e-2
     c_perturbed = perturb_c(lp, x)
-    subLP_manager = LPManager(StandardLP(A=lp.A, b=lp.b, c=c_perturbed, l=lp.l, u=lp.u))
-    subLP_manager.fix_variables(ind_fix_to_low=np.where(x < BETA * s)[0],
+    subLP_manager = LPManager(GeneralLP(A=lp.A, b=lp.b, c=c_perturbed, l=lp.l, u=lp.u, sense=lp.sense))
+    subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s)[0],
                                 ind_fix_to_up=np.where(lp.u - x < BETA * -s)[0])
     subLP_manager.update_subproblem()
     return subLP_manager
 
 
-def run_perturb_algorithm(lp: StandardLP,
+def run_perturb_algorithm(lp: GeneralLP,
                           perturb_method: str,
                           solver: str = "GRB",
                           barrierTol: float = 1e-8,
@@ -110,10 +109,10 @@ def run_perturb_algorithm(lp: StandardLP,
     """
     barrier_output = solve_lp(lp, solver, method='barrier', barrierTol=barrierTol, presolve='off', crossover='off')
 
-    def get_dual_slack() -> np.ndarray:
-        return lp.c - lp.A.transpose() @ barrier_output.y
+    def get_dual_slack(A: sp.csr_matrix, c: np.ndarray, y: np.ndarray) -> np.ndarray:
+        return c - A.transpose() @ y
 
-    perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, get_dual_slack())
+    perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, get_dual_slack(lp.A, lp.c, barrier_output.y))
     perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, method='barrier', solver=solver, barrierTol=barrierTol,
                                       presolve="on")
     final_output = solve_lp(lp, solver, presolve="off", method='simplex',

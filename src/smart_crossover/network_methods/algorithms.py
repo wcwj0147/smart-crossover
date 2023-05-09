@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 
 from smart_crossover.formats import OptTransport, MinCostFlow
-from smart_crossover.network_methods.net_manager import OTManager, MCFManager, NetworkManager
+from smart_crossover.network_methods.net_manager import OTManager, MCFManagerStd, NetworkManager
 from smart_crossover.network_methods.tree_BI import tree_basis_identify
 from smart_crossover.output import Output
 from smart_crossover.parameters import COLUMN_GENERATION_RATIO
@@ -43,7 +43,7 @@ def network_crossover(
     if method == "tnet" or method == "cnet_ot":
         manager = OTManager(ot)
     elif method == "cnet_mcf":
-        manager = MCFManager(mcf)
+        manager = MCFManagerStd(mcf)
     else:
         raise ValueError("Invalid method specified. Choose from 'tnet', 'cnet_ot', or 'cnet_mcf'.")
 
