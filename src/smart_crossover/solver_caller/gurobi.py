@@ -78,7 +78,7 @@ class GrbCaller(SolverCaller):
         # self.model.setParam("LPWarmStart", 2)
 
     def return_basis(self) -> Optional[Basis]:
-        if self.model.Params.Method == 2:
+        if self.model.Params.Crossover == 0:
             return None
         vbasis = np.array(self.model.getAttr("VBasis", self.model.getVars()))
         cbasis = np.array(self.model.getAttr("CBasis", self.model.getConstrs()))
