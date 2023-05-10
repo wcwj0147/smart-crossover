@@ -17,9 +17,10 @@ from smart_crossover.output import Basis, Output
 @dataclass
 class SolverSettings:
     presolve: str = "on"
+    crossover: str = "on"
     barrierTol: float = 1e-8
     optimalityTol: float = 1e-6
-    timeLimit: int = 600
+    timeLimit: int = 3600
     log_file: str = ""
     log_console: int = 1
 

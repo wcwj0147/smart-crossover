@@ -8,6 +8,7 @@ import scipy.sparse.linalg as splinalg
 from smart_crossover.formats import GeneralLP
 from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Output, Basis
+from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_lp
 
 
@@ -95,7 +96,8 @@ def run_perturb_algorithm(lp: GeneralLP,
                           perturb_method: str,
                           solver: str = "GRB",
                           barrierTol: float = 1e-8,
-                          optimalityTol: float = 1e-6) -> Output:
+                          optimalityTol: float = 1e-6,
+                          log_path: Optional[Path] = None) -> Output:
     """
 
     Args:
@@ -104,22 +106,25 @@ def run_perturb_algorithm(lp: GeneralLP,
         solver:
         barrierTol:
         optimalityTol:
+        log_path:
 
     Returns:
 
     """
-    barrier_output = solve_lp(lp, solver, method='barrier', barrierTol=barrierTol, presolve='off', crossover='off')
+    barrier_output = solve_lp(lp, solver,
+                              method='barrier',
+                              settings=SolverSettings(barrierTol=barrierTol, presolve='off', crossover='off'))
 
     def get_dual_slack(A: sp.csr_matrix, c: np.ndarray, y: np.ndarray) -> np.ndarray:
         return c - A.transpose() @ y
 
     perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, get_dual_slack(lp.A, lp.c, barrier_output.y))
-    perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, method='barrier', solver=solver, barrierTol=barrierTol,
-                                      presolve="on")
-    # print(check_basis_feasibility(perturbLP_manager.lp_sub, perturb_barrier_output.basis))
-    # print(check_basis_feasibility(lp, perturbLP_manager.recover_basis_from_sub_basis(perturb_barrier_output.basis)))
-    final_output = solve_lp(lp, solver, presolve="off", method='simplex',
-                            optimalityTol=optimalityTol,
+    perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
+                                      method='barrier',
+                                      settings=SolverSettings(barrierTol=barrierTol, presolve="on"))
+    final_output = solve_lp(lp, solver=solver,
+                            method='simplex',
+                            settings=SolverSettings(presolve="off", optimalityTol=optimalityTol),
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y),
                             warm_start_basis=perturbLP_manager.recover_basis_from_sub_basis(perturb_barrier_output.basis))

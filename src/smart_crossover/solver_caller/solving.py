@@ -23,34 +23,24 @@ def generate_solver_caller(solver: str = "GRB",
     return caller
 
 
-def solve_lp(lp: Union[GeneralLP, StandardLP],
-             solver: str = "GRB",
-             method: str = "default",
-             optimalityTol: float = 1e-6,
-             barrierTol: float = 1e-8,
-             presolve: str = 'on',
-             crossover: str = 'on',
-             warm_start_basis: Optional[Basis] = None,
-             warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
-    solver_caller = generate_solver_caller(solver, SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol))
-    if isinstance(lp, StandardLP):
-        solver_caller.read_stdlp(lp)
-    elif isinstance(lp, GeneralLP):
-        solver_caller.read_genlp(lp)
-    else:
-        raise ValueError("Invalid LP format.")
-
-    if method == "default" or method == "simplex":
+def solve_problem(solver_caller: SolverCaller,
+                  method: str = 'default',
+                  settings: SolverSettings = SolverSettings(),
+                  warm_start_basis: Optional[Basis] = None,
+                  warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
+    if method == "default" or method == "simplex" or method == "network_simplex":
         if warm_start_solution is not None:
             solver_caller.add_warm_start_solution(warm_start_solution)
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        if method == "simplex" and solver == "MSK":
+        if method == "simplex" and solver_caller.solver_name == "MSK":
             solver_caller.run_simplex()
+        elif method == "network_simplex":
+            solver_caller.run_network_simplex()
         else:
             solver_caller.run_default()
     elif method == "barrier":
-        if crossover == 'on':
+        if settings.crossover == 'on':
             solver_caller.run_barrier()
         else:
             solver_caller.run_barrier_no_crossover()
@@ -59,60 +49,38 @@ def solve_lp(lp: Union[GeneralLP, StandardLP],
     return solver_caller.return_output()
 
 
+
+def solve_lp(lp: Union[GeneralLP, StandardLP],
+             solver: str = "GRB",
+             method: str = "default",
+             settings: SolverSettings = SolverSettings(),
+             warm_start_basis: Optional[Basis] = None,
+             warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
+    solver_caller = generate_solver_caller(solver, settings)
+    if isinstance(lp, StandardLP):
+        solver_caller.read_stdlp(lp)
+    elif isinstance(lp, GeneralLP):
+        solver_caller.read_genlp(lp)
+    else:
+        raise ValueError("Invalid LP format.")
+    return solve_problem(solver_caller, method, settings, warm_start_basis, warm_start_solution)
+
+
 def solve_mcf(mcf: MinCostFlow,
               solver: str = "GRB",
               method: str = "default",
-              presolve: str = 'on',
-              crossover: str = 'on',
-              optimalityTol: float = 1e-6,
-              barrierTol: float = 1e-8,
+              settings: SolverSettings = SolverSettings(),
               warm_start_basis: Optional[Basis] = None) -> Output:
-    solver_settings = SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol)
-    solver_caller = generate_solver_caller(solver, solver_settings)
+    solver_caller = generate_solver_caller(solver, settings)
     solver_caller.read_mcf(mcf)
-    if method == "barrier":
-        if crossover == 'on':
-            solver_caller.run_barrier()
-        else:
-            solver_caller.run_barrier_no_crossover()
-    else:
-        if warm_start_basis is not None:
-            solver_caller.add_warm_start_basis(warm_start_basis)
-        if method == "default":
-            solver_caller.run_default()
-        elif method == "network_simplex":
-            solver_caller.run_network_simplex()
-        else:
-            raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
-
-    return solver_caller.return_output()
+    return solve_problem(solver_caller, method, settings, warm_start_basis)
 
 
 def solve_ot(ot: OptTransport,
              solver: str = "GRB",
              method: str = "default",
-             presolve: str = 'on',
-             crossover: str = 'on',
-             optimalityTol: float = 1e-6,
-             barrierTol: float = 1e-8,
+             settings: SolverSettings = SolverSettings(),
              warm_start_basis: Optional[Basis] = None) -> Output:
-    solver_settings = SolverSettings(presolve=presolve, optimalityTol=optimalityTol, barrierTol=barrierTol)
-    solver_caller = generate_solver_caller(solver, solver_settings)
+    solver_caller = generate_solver_caller(solver, settings)
     solver_caller.read_ot(ot)
-
-    if method == "barrier":
-        if crossover == 'on':
-            solver_caller.run_barrier()
-        else:
-            solver_caller.run_barrier_no_crossover()
-    else:
-        if warm_start_basis is not None:
-            solver_caller.add_warm_start_basis(warm_start_basis)
-        if method == "default":
-            solver_caller.run_default()
-        elif method == "network_simplex":
-            solver_caller.run_network_simplex()
-        else:
-            raise ValueError("Invalid method specified. Choose from 'default', 'barrier', or 'network_simplex'.")
-
-    return solver_caller.return_output()
+    return solve_problem(solver_caller, method, settings, warm_start_basis)
