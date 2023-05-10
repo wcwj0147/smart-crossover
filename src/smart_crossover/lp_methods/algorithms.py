@@ -35,7 +35,7 @@ def perturb_c(lp_ori: GeneralLP,
 
         AT = A.transpose()
         A_X = A @ X
-        A_X2_AT = A @ X2 @ AT
+        A_X2_AT = A_X @ A_X.T
 
         # Compute temp1 = A X c
         temp1 = A_X @ c
