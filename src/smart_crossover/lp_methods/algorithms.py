@@ -1,12 +1,13 @@
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import lsqr
+import scipy.sparse.linalg as splinalg
 
-from smart_crossover.formats import StandardLP, GeneralLP
+from smart_crossover.formats import GeneralLP
 from smart_crossover.lp_methods.lp_manager import LPManager
-from smart_crossover.output import Output
+from smart_crossover.output import Output, Basis
 from smart_crossover.solver_caller.solving import solve_lp
 
 
@@ -24,7 +25,7 @@ def perturb_c(lp_ori: GeneralLP,
 
     """
     SCALE_FACTOR_FOR_PERTURBATION = 1e-2
-    PERTURB_THRESHOLD = 1e-5
+    PERTURB_THRESHOLD = 1e-3
     n = len(x)
 
     def compute_projector(A: sp.csr_matrix, x: np.ndarray, c: np.ndarray) -> np.ndarray:
@@ -40,7 +41,7 @@ def perturb_c(lp_ori: GeneralLP,
         temp1 = A_X @ c
 
         # Solve the linear least-squares problem using lsqr
-        solution = lsqr(A=A_X2_AT, b=temp1, atol=1e-6, btol=1e-6, iter_lim=1000, show=False)
+        solution = splinalg.lsqr(A=A_X2_AT, b=temp1, atol=1e-6, btol=1e-6, iter_lim=3000, show=False)
         y = solution[0]
 
         # Compute the final result
