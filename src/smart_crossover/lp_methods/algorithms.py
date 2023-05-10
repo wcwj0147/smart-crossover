@@ -128,23 +128,3 @@ def run_perturb_algorithm(lp: GeneralLP,
                   obj_val=final_output.obj_val,
                   runtime=barrier_output.runtime + perturb_barrier_output.runtime + final_output.runtime,
                   iter_count=perturb_barrier_output.iter_count + final_output.iter_count)
-
-
-def check_basis_feasibility(lp: GeneralLP, basis: Basis) -> bool:
-    """
-    Check if the basis is feasible for the given LP.
-    """
-    B = lp.A[:, basis.vbasis == 0]
-    B = B[basis.cbasis == -1, :]
-    assert B.shape[0] == B.shape[1], "B should be a square matrix."
-
-    def compute_cond_number(B):
-        B_dense = B.toarray()
-        cond_number = np.linalg.cond(B_dense)
-        return cond_number
-
-    assert compute_cond_number(B) < 1 / 1e-12, "The basis is near singular."
-
-    b_bas = lp.b[basis.cbasis == -1]
-    x = splinalg.spsolve(B, b_bas)
-    return (x - lp.l[basis.vbasis==0] >= -1e-12).all() and (lp.u[basis.vbasis==0] - x > -1e-12).all()
