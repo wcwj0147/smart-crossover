@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -97,7 +96,7 @@ def run_perturb_algorithm(lp: GeneralLP,
                           solver: str = "GRB",
                           barrierTol: float = 1e-8,
                           optimalityTol: float = 1e-6,
-                          log_path: Optional[Path] = None) -> Output:
+                          log_file_head: str = '') -> Output:
     """
 
     Args:
@@ -106,14 +105,14 @@ def run_perturb_algorithm(lp: GeneralLP,
         solver:
         barrierTol:
         optimalityTol:
-        log_path:
+        log_file:
 
     Returns:
 
     """
     barrier_output = solve_lp(lp, solver,
                               method='barrier',
-                              settings=SolverSettings(barrierTol=barrierTol, presolve='off', crossover='off'))
+                              settings=SolverSettings(barrierTol=barrierTol, presolve='off', crossover='off', log_file=log_file_head+'_ori_bar.log'))
 
     def get_dual_slack(A: sp.csr_matrix, c: np.ndarray, y: np.ndarray) -> np.ndarray:
         return c - A.transpose() @ y
@@ -121,10 +120,10 @@ def run_perturb_algorithm(lp: GeneralLP,
     perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, get_dual_slack(lp.A, lp.c, barrier_output.y))
     perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
                                       method='barrier',
-                                      settings=SolverSettings(barrierTol=barrierTol, presolve="on"))
+                                      settings=SolverSettings(barrierTol=barrierTol, presolve="on", log_file=log_file_head+'_ptb_bar.log'))
     final_output = solve_lp(lp, solver=solver,
                             method='simplex',
-                            settings=SolverSettings(presolve="off", optimalityTol=optimalityTol),
+                            settings=SolverSettings(presolve="off", optimalityTol=optimalityTol, log_file=log_file_head+'_final.log'),
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y),
                             warm_start_basis=perturbLP_manager.recover_basis_from_sub_basis(perturb_barrier_output.basis))
