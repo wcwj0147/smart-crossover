@@ -17,7 +17,7 @@ MSK_INF = np.inf  # Only a symbolic constant, used for readability.
 class MskCaller(SolverCaller):
 
     def __init__(self, solver_settings: Optional[SolverSettings] = SolverSettings()) -> None:
-        self.solver_name = "mosek"
+        self.solver_name = "MSK"
         self.settings = solver_settings
         self.env = mosek.Env()
         self.model = self.env.Task()

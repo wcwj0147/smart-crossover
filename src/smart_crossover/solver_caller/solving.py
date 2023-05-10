@@ -24,8 +24,8 @@ def generate_solver_caller(solver: str = "GRB",
 
 
 def solve_problem(solver_caller: SolverCaller,
-                  method: str = 'default',
-                  settings: SolverSettings = SolverSettings(),
+                  method: str,
+                  settings: SolverSettings,
                   warm_start_basis: Optional[Basis] = None,
                   warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
     if method == "default" or method == "simplex" or method == "network_simplex":
@@ -47,7 +47,6 @@ def solve_problem(solver_caller: SolverCaller,
     else:
         raise ValueError("Invalid method specified. Choose from 'default' or 'barrier'.")
     return solver_caller.return_output()
-
 
 
 def solve_lp(lp: Union[GeneralLP, StandardLP],

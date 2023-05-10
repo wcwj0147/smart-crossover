@@ -18,7 +18,7 @@ class GrbCaller(SolverCaller):
 
     def __init__(self,
                  solver_settings: Optional[SolverSettings] = SolverSettings()) -> None:
-        self.solver_name = "gurobi"
+        self.solver_name = "GRB"
         self.settings = solver_settings
 
     def read_model_from_file(self, path: str) -> None:

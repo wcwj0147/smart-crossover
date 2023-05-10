@@ -12,7 +12,7 @@ from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
 class CplCaller(SolverCaller):
     def __init__(self, solver_settings: Optional[SolverSettings] = SolverSettings()) -> None:
-        self.solver_name = "cplex"
+        self.solver_name = "CPL"
         self.settings = solver_settings
         self.model = cplex.Cplex()
         self.runtime = 0
