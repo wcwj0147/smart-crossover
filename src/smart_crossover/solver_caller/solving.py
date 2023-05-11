@@ -28,7 +28,7 @@ def solve_problem(solver_caller: SolverCaller,
                   settings: SolverSettings,
                   warm_start_basis: Optional[Basis] = None,
                   warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
-    if method == "default" or method == "simplex" or method == "network_simplex":
+    if method in ["default", "simplex", "network_simplex", "primal_simplex", "dual_simplex"]:
         if warm_start_solution is not None:
             solver_caller.add_warm_start_solution(warm_start_solution)
         if warm_start_basis is not None:
@@ -37,8 +37,10 @@ def solve_problem(solver_caller: SolverCaller,
             solver_caller.run_simplex()
         elif method == "network_simplex":
             solver_caller.run_network_simplex()
-        else:
-            solver_caller.run_default()
+        elif method == "primal_simplex":
+            solver_caller.run_primal_simplex()
+        elif method == "dual_simplex":
+            solver_caller.run_dual_simplex()
     elif method == "barrier":
         if settings.crossover == 'on':
             solver_caller.run_barrier()
