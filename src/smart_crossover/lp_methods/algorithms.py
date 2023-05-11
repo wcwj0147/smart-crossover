@@ -36,7 +36,8 @@ def perturb_c(lp_ori: GeneralLP,
 
     perturbation_vector = np.zeros_like(x, dtype=np.float64)
     x_min = np.minimum(x - lp_ori.l, lp_ori.u - x)
-    # Transfer to standard form temporarily to calculate the projector.
+    x_min[lp_ori.get_free_variables()] = 0  # free variables are not perturbed
+    # calculate the projector: (A X)^T (A X X A^T)† (A X) c
     projector = apply_projector(lp_ori.A @ sp.diags(x_min), lp_ori.c)
 
     # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
@@ -83,14 +84,15 @@ def run_perturb_algorithm(lp: GeneralLP,
     """
 
     Args:
-        lp:
-        perturb_method:
-        solver:
-        barrierTol:
-        optimalityTol:
-        log_file:
+        lp: the original LP problem in GeneralLP format.
+        perturb_method: the perturbation method (choose from 'random', 'primal', 'dual').
+        solver: the solver used to solve the LP.
+        barrierTol: the barrier tolerance.
+        optimalityTol: the optimality tolerance.
+        log_file: the log file name.
 
     Returns:
+         the output of the perturbed algorithm.
 
     """
     barrier_output = solve_lp(lp, solver,
