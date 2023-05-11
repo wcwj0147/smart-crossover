@@ -145,6 +145,12 @@ class CplCaller(SolverCaller):
 
     def return_reduced_cost(self) -> np.ndarray:
         return np.array(self.model.solution.get_reduced_costs())
+    
+    def return_status(self) -> str:
+        if self.model.solution.get_status_string() == 'optimal':
+            return 'OPTIMAL'
+        else:
+            return 'OTHER'
 
     def run_default(self) -> None:
         """Run default algorithm on the current model."""

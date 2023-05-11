@@ -196,6 +196,12 @@ class MskCaller(SolverCaller):
     def return_reduced_cost(self) -> np.ndarray:
         return np.array(self.task.getreducedcosts(mosek.soltype.bas))
 
+    def return_status(self) -> str:
+        if self.task.getsolsta(mosek.soltype.bas) == mosek.solsta.optimal:
+            return "OPTIMAL"
+        else:
+            return "OTHER"
+
     def run_default(self) -> None:
         """Run default algorithm on the current model."""
         # set the method to automatic
@@ -252,7 +258,7 @@ class MskCaller(SolverCaller):
 
     def _set_tol(self) -> None:
         self.task.putdouparam(mosek.dparam.intpnt_tol_rel_gap, self.settings.barrierTol)
-        self.task.putdouparam(mosek.dparam.simplex_abs_tol_piv, self.settings.optimalityTol)
+        # Todo: self.task.putdouparam(mosek.dparam.basis_tol_s, self.settings.optimalityTol)
 
     def _set_presolve(self) -> None:
         # turn off the presolve if setting.presolve is "off"

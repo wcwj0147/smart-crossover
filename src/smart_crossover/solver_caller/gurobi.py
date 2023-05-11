@@ -144,6 +144,16 @@ class GrbCaller(SolverCaller):
     def return_reduced_cost(self) -> np.ndarray:
         return np.array(self.model.getAttr("RC", self.model.getVars()))
 
+    def return_status(self) -> str:
+        if self.model.getAttr('Status') == GRB.OPTIMAL:
+            return "OPTIMAL"
+        elif self.model.getAttr('Status') == GRB.INFEASIBLE:
+            return "INFEASIBLE"
+        elif self.model.getAttr('Status') == GRB.UNBOUNDED:
+            return "UNBOUNDED"
+        else:
+            return "UNKNOWN"
+
     def _run(self) -> None:
         self._set_log()
         self._set_tol()

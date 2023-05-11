@@ -111,7 +111,12 @@ class SolverCaller(ABC):
     def return_reduced_cost(self) -> np.ndarray:
         ...
 
+    def return_status(self) -> str:
+        ...
+
     def return_output(self) -> Output:
+        if self.return_status() != "OPTIMAL":
+            return Output()
         return Output(x=self.return_x(),
                       y=self.return_y(),
                       x_bar=self.return_barx(),
