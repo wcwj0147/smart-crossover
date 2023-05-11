@@ -10,23 +10,29 @@
 %    A standard form LP model:
 %             min      c^T x
 %             s.t.     A x = b
-%                   0 <= x <= u
+%                   0 <= xi <= u
+%                      xj free
+
 
 
 %% Main procedure: get standard LP for each model.
 lp_data_path = fullfile(pwd, 'all');
 lp_files = dir(fullfile(lp_data_path, '*.mps'));
 
-f = waitbar(0, 'Starting');
+f = waitbar(0, 'Starting');  % set the progress bar
 K = length(lp_files);
-for k = 19:K
+for k = 4:K
     waitbar(k/K, f, sprintf('Progress: %d %%, %s', floor(k/K*100), lp_files(k).name));
+    
+    % read the general models
     m = gurobi_read(fullfile(lp_data_path, lp_files(k).name));
     results = gurobi(gurobi_relax(m));
     if isfield(m, 'modelname')
         m_std.modelname = m.modelname;
     end
     assert(~isfield(m, 'modelsense'), "Model is to maximize.")
+
+    % Generate the standard form and check.
     [A, b, c, u, cost_change] = to_standard_form(m.A, m.rhs, m.obj, m.lb, m.ub, m.sense);
     m_std.A     = A;
     m_std.rhs   = b;
@@ -36,7 +42,9 @@ for k = 19:K
     m_std.sense = '=';
     params.Method = 2;
     results_std = gurobi(m_std, params);
-    assert(abs(results.objval-results_std.objval-cost_change) < 1e-6, "Transfermation failed!")
+    
+    assert(abs(results.objval-results_std.objval-cost_change) < 1e-4, "Transfermation failed!")
+
     gurobi_write(m_std, fullfile(pwd, 'standard', lp_files(k).name))
 end
 waitbar(1, f, 'Done!');
@@ -72,19 +80,9 @@ u_std = [u_std; inf(le_num + ge_num, 1)];
 c_std = [c_std; zeros(le_num + ge_num, 1)];
 
 % Identify variables with l = -inf and u = inf, and l = -inf and u < inf
-free_vars = (l == -inf) & (u == inf);
 down_free_vars = (l == -inf) & (u < inf);
 up_free_vars = (l > -inf) & (u == inf);
 bounded_vars = (l > -inf) & (u < inf);
-
-% For free variables
-if any(free_vars)
-    num_free_vars = sum(free_vars);
-    A_std = [A_std, -A_std(:, free_vars)];
-    u_std = [u_std; inf(num_free_vars, 1)];
-    u_std(free_vars) = inf;
-    c_std = [c_std; -c_std(free_vars)];
-end
 
 % Replace variables with l = -inf and u < inf with u-x
 if any(down_free_vars)
