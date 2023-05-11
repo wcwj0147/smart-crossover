@@ -105,7 +105,7 @@ def run_perturb_algorithm(lp: GeneralLP,
                                       method='barrier',
                                       settings=SolverSettings(barrierTol=barrierTol, presolve="on", log_file=log_file_head+'_ptb_bar.log'))
     final_output = solve_lp(lp, solver=solver,
-                            method='simplex',
+                            method='primal_simplex',
                             settings=SolverSettings(presolve="off", optimalityTol=optimalityTol, log_file=log_file_head+'_final.log'),
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y),

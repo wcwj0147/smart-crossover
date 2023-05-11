@@ -142,6 +142,9 @@ class SolverCaller(ABC):
     def run_simplex(self) -> None:
         ...
 
+    def run_primal_simplex(self) -> None:
+        ...
+
     def run_dual_simplex(self) -> None:
         ...
 

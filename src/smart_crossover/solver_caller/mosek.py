@@ -197,10 +197,12 @@ class MskCaller(SolverCaller):
         return np.array(self.task.getreducedcosts(mosek.soltype.bas))
 
     def return_status(self) -> str:
+        if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
+            if self.task.getsolsta(mosek.soltype.itr) == mosek.solsta.optimal:
+                return "OPTIMAL"
         if self.task.getsolsta(mosek.soltype.bas) == mosek.solsta.optimal:
             return "OPTIMAL"
-        else:
-            return "OTHER"
+        return "OTHER"
 
     def run_default(self) -> None:
         """Run default algorithm on the current model."""
@@ -271,6 +273,7 @@ class MskCaller(SolverCaller):
         self.env.set_Stream(mosek.streamtype.log, _stream_printer)
         self.task.set_Stream(mosek.streamtype.log, _stream_printer)
         self.env.linkfiletostream(mosek.streamtype.log, self.settings.log_file, 0)
+        self.task.linkfiletostream(mosek.streamtype.log, self.settings.log_file, 0)
 
     def _set_time_limit(self) -> None:
         self.task.putdouparam(mosek.dparam.optimizer_max_time, self.settings.timeLimit)
