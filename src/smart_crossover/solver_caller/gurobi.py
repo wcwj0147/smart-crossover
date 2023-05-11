@@ -28,7 +28,7 @@ class GrbCaller(SolverCaller):
         model = gurobipy.Model()
         x = model.addMVar(shape=stdlp.c.size, ub=stdlp.u, name='x')
         model.setObjective(stdlp.c @ x, GRB.MINIMIZE)
-        model.addMConstr(stdlp.A, x, '=', stdlp.b, name='Ax')
+        model.addMConstrs(stdlp.A, x, '=', stdlp.b, name='Ax')
         self.model = model
         self.model.update()
 
@@ -40,7 +40,7 @@ class GrbCaller(SolverCaller):
         model = gurobipy.Model()
         x = model.addMVar(shape=genlp.c.size, lb=genlp.l, ub=genlp.u, name='x')
         model.setObjective(genlp.c @ x, GRB.MINIMIZE)
-        model.addMConstr(genlp.A, x, genlp.sense, genlp.b, name='Ax')
+        model.addMConstrs(genlp.A, x, genlp.sense, genlp.b, name='Ax')
         self.model = model
         self.model.update()
 
