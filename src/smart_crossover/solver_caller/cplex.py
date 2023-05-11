@@ -214,8 +214,10 @@ class CplCaller(SolverCaller):
             self.model.parameters.preprocessing.presolve.set(1)
 
     def _set_log(self) -> None:
-        self.model.parameters.simplex.display.set(2)
-        self.model.parameters.barrier.display.set(2)
+        self.model.parameters.simplex.display.set(1)
+        self.model.parameters.barrier.display.set(1)
+        self.model.set_results_stream(self.settings.log_file)
+        self.model.set_log_stream(self.settings.log_file)
 
     def _set_time_limit(self) -> None:
         self.model.parameters.setTimeLimit = self.settings.timeLimit
