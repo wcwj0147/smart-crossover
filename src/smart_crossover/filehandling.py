@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, List
 
 import gurobipy
 
@@ -7,7 +7,6 @@ from smart_crossover import get_project_root
 from smart_crossover.solver_caller.gurobi import GrbCaller
 
 
-# Todo: remove this class. It seems that we only need some functions.
 class FileHandler:
     """
     A class representing a filehandler, who reads, writes, and transfer optimization models using Gurobi.
@@ -17,10 +16,10 @@ class FileHandler:
         grbCaller (GrbCaller): a gurobi caller to presolve or transfer models.
 
     """
-    models: list[gurobipy.Model]
+    models: List[gurobipy.Model]
     grbCaller: GrbCaller
 
-    def __init__(self, models: Optional[list[gurobipy.Model]] = None) -> None:
+    def __init__(self, models: Optional[List[gurobipy.Model]] = None) -> None:
         self.models = models
         self.grbCaller = GrbCaller()
 
@@ -33,7 +32,7 @@ class FileHandler:
 
         """
         self.models = []
-        files: list[str] = [f for f in os.listdir(path) if f.endswith('.mps') or f.endswith('.lp')]
+        files: List[str] = [f for f in os.listdir(path) if f.endswith('.mps') or f.endswith('.lp')]
         for file in files:
             self.grbCaller.read_model_from_file(path + "/" + file)
             base_name, _ = os.path.splitext(file)

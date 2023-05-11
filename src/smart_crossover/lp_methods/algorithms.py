@@ -28,33 +28,16 @@ def perturb_c(lp_ori: GeneralLP,
     PERTURB_THRESHOLD = 1e-3
     n = len(x)
 
-    def compute_projector(A: sp.csr_matrix, x: np.ndarray, c: np.ndarray) -> np.ndarray:
-        """Compute the projector P_{X^{-1} L}(c) = (I − X A^⊤ (A X^2 A)^† A X) c"""
-        X = sp.diags(x)
-        X2 = sp.diags(x ** 2)
-
-        AT = A.transpose()
-        A_X = A @ X
-        A_X2_AT = A_X @ A_X.T
-
-        # Compute temp1 = A X c
-        temp1 = A_X @ c
-
-        # Solve the linear least-squares problem using lsqr
-        solution = splinalg.lsqr(A=A_X2_AT, b=temp1, atol=1e-6, btol=1e-6, iter_lim=3000, show=False)
-        y = solution[0]
-
-        # Compute the final result
-        temp2 = AT @ y
-        result = c - X @ temp2
-
-        return result
+    def apply_projector(Y, c, tol=1e-8, max_iter=1000):
+        """ Apply the projection matrix Y^T (Y Y^T)† Y to a vector c using conjugate gradient method. """
+        Yc = Y @ c
+        z, _ = splinalg.cg(Y @ Y.T, Yc, tol=tol, maxiter=max_iter)
+        return Y.T @ z
 
     perturbation_vector = np.zeros_like(x, dtype=np.float64)
     x_min = np.minimum(x - lp_ori.l, lp_ori.u - x)
     # Transfer to standard form temporarily to calculate the projector.
-    projector_extend = compute_projector(lp_ori.get_standard_A(), lp_ori.get_standard_var_vector(x_min), lp_ori.get_standard_c())
-    projector = lp_ori.recover_standard_var_vector(projector_extend)
+    projector = apply_projector(lp_ori.A @ sp.diags(x_min), lp_ori.c)
 
     # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
     denominator = x_min * np.abs(projector) * SCALE_FACTOR_FOR_PERTURBATION * n
