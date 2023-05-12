@@ -272,8 +272,8 @@ class MskCaller(SolverCaller):
     def _set_log(self) -> None:
         self.env.set_Stream(mosek.streamtype.log, _stream_printer)
         self.task.set_Stream(mosek.streamtype.log, _stream_printer)
-        self.env.linkfiletostream(mosek.streamtype.log, self.settings.log_file, 0)
-        self.task.linkfiletostream(mosek.streamtype.log, self.settings.log_file, 0)
+        self.env.linkfiletostream(mosek.streamtype.log, self.settings.log_file, 1)
+        self.task.linkfiletostream(mosek.streamtype.log, self.settings.log_file, 1)
 
     def _set_time_limit(self) -> None:
         self.task.putdouparam(mosek.dparam.optimizer_max_time, self.settings.timeLimit)
