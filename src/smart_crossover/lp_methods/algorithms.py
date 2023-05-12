@@ -24,8 +24,8 @@ def perturb_c(lp_ori: GeneralLP,
         Perturbed cost vector.
 
     """
-    SCALE_FACTOR_FOR_PERTURBATION = 1e-2
-    PERTURB_THRESHOLD = 1e-3
+    CONSTANT_SCALE_FACTOR = 1e-2
+    PERTURB_THRESHOLD = 1e-6
     n = len(x)
 
     def apply_projector(Y, c, tol=1e-8, max_iter=1000):
@@ -40,10 +40,11 @@ def perturb_c(lp_ori: GeneralLP,
     # calculate the projector: (A X)^T (A X X A^T)† (A X) c
     projector = apply_projector(lp_ori.A @ sp.diags(x_min), lp_ori.c)
 
-    # Todo: check if the following line is correct
-    # Compute the perturbation vector = 1 / (x_min * |projector| * SCALE_FACTOR_FOR_PERTURBATION * n)
-    denominator = x_min * np.abs(projector) * SCALE_FACTOR_FOR_PERTURBATION * n
-    perturbation_vector[denominator > PERTURB_THRESHOLD] = 1 / denominator[denominator > PERTURB_THRESHOLD]
+    # Compute the perturbation vector = scale_factor * np.random / x_min, where scale_factor = ||projector|| / CONSTANT_SCALE_FACTOR * n
+    scale_factor = np.linalg.norm(projector) / (CONSTANT_SCALE_FACTOR * n)
+    p = np.random.uniform(0.5, 1, np.sum(x_min > PERTURB_THRESHOLD))
+    p = p / x_min[x_min > PERTURB_THRESHOLD] * scale_factor
+    perturbation_vector[x_min > PERTURB_THRESHOLD] = p
 
     c_pt = lp_ori.c + perturbation_vector
     return c_pt
@@ -72,7 +73,6 @@ def get_perturb_problem(lp: GeneralLP,
         A LP manager of a sub-problem restricted on the approximated optimal face.
 
     """
-    BETA = 1e-2
 
     def get_dual_slack(A: sp.csr_matrix, c: np.ndarray, y: np.ndarray) -> np.ndarray:
         return c - A.transpose() @ y
@@ -80,20 +80,24 @@ def get_perturb_problem(lp: GeneralLP,
     def get_primal_slack(A: sp.csr_matrix, b: np.ndarray, x: np.ndarray) -> np.ndarray:
         return b - A @ x
 
-    if perturb_method == 'primal':
-        c_perturbed = perturb_c(lp, x)
-        subLP_manager = LPManager(GeneralLP(A=lp.A, b=lp.b, c=c_perturbed, l=lp.l, u=lp.u, sense=lp.sense))
-    elif perturb_method == 'dual':
-        b_perturb = perturb_b(lp, y)
-        subLP_manager = LPManager(GeneralLP(A=lp.A, b=b_perturb, c=lp.c, l=lp.l, u=lp.u, sense=lp.sense))
-    else:
-        raise ValueError("The perturbation method is not supported.")
+    BETA = 1e-2
 
     s = get_dual_slack(lp.A, lp.c, y)
-    # Todo: find the sub-problem first.
+
+    subLP_manager = LPManager(lp.copy())
     subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s)[0],
                                 ind_fix_to_up=np.where(lp.u - x < BETA * -s)[0])
     subLP_manager.update_subproblem()
+
+    if perturb_method == 'primal':
+        c_perturbed = perturb_c(subLP_manager.lp_sub, subLP_manager.get_subx(x))
+        subLP_manager.update_c(c_perturbed)
+    elif perturb_method == 'dual':
+        b_perturb = perturb_b(lp, y)
+        subLP_manager.update_b(b_perturb)
+    else:
+        raise ValueError("The perturbation method is not supported.")
+
     return subLP_manager
 
 
@@ -119,7 +123,7 @@ def run_perturb_algorithm(lp: GeneralLP,
     """
     barrier_output = solve_lp(lp, solver,
                               method='barrier',
-                              settings=SolverSettings(barrierTol=barrierTol, presolve='off', crossover='off', log_file=log_file_head+'_ori_bar.log'))
+                              settings=SolverSettings(barrierTol=barrierTol, presolve='on', crossover='off', log_file=log_file_head+'_ori_bar.log'))
 
     perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, barrier_output.y)
 
@@ -129,7 +133,7 @@ def run_perturb_algorithm(lp: GeneralLP,
 
     final_output = solve_lp(lp, solver=solver,
                             method='primal_simplex',
-                            settings=SolverSettings(presolve="off", optimalityTol=optimalityTol, log_file=log_file_head+'_final.log'),
+                            settings=SolverSettings(presolve="on", optimalityTol=optimalityTol, log_file=log_file_head+'_final.log'),
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y),
                             warm_start_basis=perturbLP_manager.recover_basis_from_sub_basis(perturb_barrier_output.basis))

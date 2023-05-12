@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Union, Optional
 
@@ -41,6 +43,9 @@ class GeneralLP:
 
     def recover_standard_var_vector(self, var_vector_std: np.ndarray) -> np.ndarray:
         return var_vector_std[:self.c.size]
+
+    def copy(self) -> GeneralLP:
+        return GeneralLP(self.A.copy(), self.b.copy(), self.c.copy(), self.l.copy(), self.u.copy(), self.sense.copy(), self.name)
 
 
 @dataclass

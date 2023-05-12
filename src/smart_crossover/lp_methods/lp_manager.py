@@ -65,3 +65,16 @@ class LPManager:
         vbasis[self.var_info['fix_up']] = -2
         cbasis = basis_sub.cbasis
         return Basis(vbasis, cbasis)
+
+    def get_subx(self, x: np.ndarray) -> np.ndarray:
+        """ Get the solution of the sub problem from the solution of the current LP. """
+        return x[self.var_info['non_fix']]
+
+    def update_c(self, c_sub_new: np.ndarray) -> None:
+        """ Update the objective function of the current LP. """
+        self.lp.c[self.var_info['non_fix']] = c_sub_new
+        self.lp_sub.c = c_sub_new
+
+    def update_b(self, b_new: np.ndarray) -> None:
+        """ Update the right-hand side of the current LP. """
+        self.lp.b = b_new
