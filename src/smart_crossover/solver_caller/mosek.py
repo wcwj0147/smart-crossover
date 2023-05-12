@@ -260,7 +260,7 @@ class MskCaller(SolverCaller):
 
     def _set_tol(self) -> None:
         self.task.putdouparam(mosek.dparam.intpnt_tol_rel_gap, self.settings.barrierTol)
-        # Todo: self.task.putdouparam(mosek.dparam.basis_tol_s, self.settings.optimalityTol)
+        self.task.putdouparam(mosek.dparam.basis_tol_s, self.settings.optimalityTol)
 
     def _set_presolve(self) -> None:
         # turn off the presolve if setting.presolve is "off"

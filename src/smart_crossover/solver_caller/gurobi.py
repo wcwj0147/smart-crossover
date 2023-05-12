@@ -45,7 +45,7 @@ class GrbCaller(SolverCaller):
         self.model.update()
 
     def get_A(self) -> sp.csr_matrix:
-        return self.model.getA()
+        return self.model.getA().tocsr()
 
     def get_b(self) -> np.ndarray:
         return np.array(self.model.getAttr("RHS", self.model.getConstrs()))
