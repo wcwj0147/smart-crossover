@@ -59,7 +59,7 @@ class FileHandler:
         """ Presolve saved models using Gurobi and write them to the given path."""
         for model in self.models:
             print(f"Consider model: {model.ModelName}")
-            presolved_model = model.presolve()
+            presolved_model = model.relax().presolve()
             presolved_model.ModelName = model.ModelName
             presolved_model.write(path + f"/{model.ModelName}.mps")
 
