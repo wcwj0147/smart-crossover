@@ -119,7 +119,6 @@ class SolverCaller(ABC):
             return Output()
         return Output(x=self.return_x(),
                       y=self.return_y(),
-                      x_bar=self.return_barx(),
                       obj_val=self.return_obj_val(),
                       runtime=self.return_runtime(),
                       iter_count=self.return_iter_count(),
