@@ -35,6 +35,7 @@ class LPManager:
                          'fix_low': np.array([], dtype=np.int64),
                          'fix_up': np.array([], dtype=np.int64),
                          'fix': np.array([], dtype=np.int64)}
+        self.fixed_constraints = np.array([], dtype=np.int64)
 
     def fix_variables(self, ind_fix_to_low: np.ndarray, ind_fix_to_up: np.ndarray) -> None:
         """ Fix some variables to lower/upper bounds in the sub problem. """
@@ -47,15 +48,17 @@ class LPManager:
         """ Update the sub problem by the information of variables. """
         if self.var_info['fix'].size == 0:
             self.lp_sub = self.lp
-            return
-        self.lp_sub = GeneralLP(
-            A=self.lp.A[:, self.var_info['non_fix']],
-            b=self.lp.b - self.lp.A[:, self.var_info['fix_up']] @ self.lp.u[self.var_info['fix_up']] - self.lp.A[:, self.var_info['fix_low']] @ self.lp.l[self.var_info['fix_low']],
-            c=self.lp.c[self.var_info['non_fix']],
-            l=self.lp.l[self.var_info['non_fix']],
-            u=self.lp.u[self.var_info['non_fix']],
-            sense=self.lp.sense
-        )
+        else:
+            self.lp_sub = GeneralLP(
+                A=self.lp.A[:, self.var_info['non_fix']],
+                b=self.lp.b - self.lp.A[:, self.var_info['fix_up']] @ self.lp.u[self.var_info['fix_up']] - self.lp.A[:, self.var_info['fix_low']] @ self.lp.l[self.var_info['fix_low']],
+                c=self.lp.c[self.var_info['non_fix']],
+                l=self.lp.l[self.var_info['non_fix']],
+                u=self.lp.u[self.var_info['non_fix']],
+                sense=self.lp.sense
+            )
+        if self.fixed_constraints.size > 0:
+            self.lp_sub.sense[self.fixed_constraints] = '='
 
     def recover_x_from_sub_x(self, x_sub: np.ndarray) -> np.ndarray:
         """ Recover the solution of the current LP from a solution of the sub problem. """
@@ -84,3 +87,7 @@ class LPManager:
     def update_b(self, b_new: np.ndarray) -> None:
         """ Update the right-hand side of the current LP. """
         self.lp.b = b_new
+
+    def fix_constraints(self, ind_fix_to_up: np.ndarray) -> None:
+        """ Fix some constraints to upper bounds in the sub problem. """
+        self.fixed_constraints = ind_fix_to_up

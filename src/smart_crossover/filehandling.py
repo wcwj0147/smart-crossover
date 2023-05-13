@@ -1,5 +1,6 @@
 import os
-from typing import Optional, List
+import pickle
+from typing import Optional, List, Any
 
 import gurobipy
 
@@ -71,3 +72,16 @@ class FileHandler:
             report_str += self.grbCaller.get_model_report()
             report_str += "\n"
         return report_str
+
+
+def read_results_from_pickle(path: str) -> Any:
+    """ Read results from pickle file."""
+    with open(get_project_root() / "results" / path, 'rb') as infile:
+        results = pickle.load(infile)
+    return results
+
+
+def write_results_to_pickle(results: Any, path: str) -> None:
+    """ Write results to pickle file."""
+    with open(get_project_root() / "results" / path, 'wb') as outfile:
+        pickle.dump(results, outfile)

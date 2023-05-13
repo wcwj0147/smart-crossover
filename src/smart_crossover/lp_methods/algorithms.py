@@ -83,11 +83,13 @@ def get_perturb_problem(lp: GeneralLP,
 
     BETA = 1e-2
 
-    s = get_dual_slack(lp.A, lp.c, y)
+    s_d = get_dual_slack(lp.A, lp.c, y)
+    s_p = get_primal_slack(lp.A, lp.b, x)
 
     subLP_manager = LPManager(lp.copy())
-    subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s)[0],
-                                ind_fix_to_up=np.where(lp.u - x < BETA * -s)[0])
+    subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s_d)[0],
+                                ind_fix_to_up=np.where(lp.u - x < BETA * -s_d)[0])
+    subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < BETA * -y)[0])
     subLP_manager.update_subproblem()
 
     if perturb_method == 'primal':
