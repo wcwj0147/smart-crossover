@@ -31,7 +31,10 @@ class LPManager:
         self.lp = lp
         self.m = self.lp.b.size
         self.n = self.lp.c.size
-        self.var_info = {'non_fix': np.array(range(self.n), dtype=np.int64)}
+        self.var_info = {'non_fix': np.array(range(self.n), dtype=np.int64),
+                         'fix_low': np.array([], dtype=np.int64),
+                         'fix_up': np.array([], dtype=np.int64),
+                         'fix': np.array([], dtype=np.int64)}
 
     def fix_variables(self, ind_fix_to_low: np.ndarray, ind_fix_to_up: np.ndarray) -> None:
         """ Fix some variables to lower/upper bounds in the sub problem. """
@@ -42,6 +45,9 @@ class LPManager:
 
     def update_subproblem(self) -> None:
         """ Update the sub problem by the information of variables. """
+        if self.var_info['fix'].size == 0:
+            self.lp_sub = self.lp
+            return
         self.lp_sub = GeneralLP(
             A=self.lp.A[:, self.var_info['non_fix']],
             b=self.lp.b - self.lp.A[:, self.var_info['fix_up']] @ self.lp.u[self.var_info['fix_up']] + self.lp.A[:, self.var_info['fix_low']] @ self.lp.l[self.var_info['fix_low']],
