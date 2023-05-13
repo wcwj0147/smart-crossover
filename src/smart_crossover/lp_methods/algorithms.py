@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import numpy as np
@@ -124,8 +125,12 @@ def perturb_c(lp_ori: GeneralLP,
     # Compute the perturbation vector = scale_factor / x_real * np.random / ||np.random||.
     p = np.random.uniform(0.5, 1, np.sum(x_real > PERTURB_THRESHOLD))
     p = p / np.linalg.norm(p)
-    p = p / x_real[x_real > PERTURB_THRESHOLD] * get_scale_factor(get_projector_c(lp_ori, x), n)
+    projector = get_projector_c(lp_ori, x)
+    scale_factor = get_scale_factor(projector, n)
+    p = p / x_real[x_real > PERTURB_THRESHOLD] * scale_factor
     perturbation_vector[x_real > PERTURB_THRESHOLD] = p
+
+    logging.info("  Projector: %{pj}s,  Scale factor: %{sf}", {'pj': np.linalg.norm(projector), 'sf': scale_factor})
 
     c_pt = lp_ori.c + perturbation_vector
     return c_pt
