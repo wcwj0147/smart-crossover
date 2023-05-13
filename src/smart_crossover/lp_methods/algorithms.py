@@ -11,99 +11,6 @@ from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_lp
 
 
-def perturb_c(lp_ori: GeneralLP,
-              x: np.ndarray) -> np.ndarray:
-    """
-    Perturb the input array `c` based on the interior-point solution `x`.
-
-    Args:
-        lp_ori: The original LP.
-        x: An interior-point solution used to generate the perturbation.
-
-    Returns:
-        Perturbed cost vector.
-
-    """
-    CONSTANT_SCALE_FACTOR = 1e-2
-    PERTURB_THRESHOLD = 1e-6
-    n = len(x)
-
-    def apply_projector(Y, c, tol=1e-8, max_iter=1000):
-        """ Apply the projection matrix Y^T (Y Y^T)† Y to a vector c using conjugate gradient method. """
-        Yc = Y @ c
-        z, _ = splinalg.cg(Y @ Y.T, Yc, tol=tol, maxiter=max_iter)
-        return Y.T @ z
-
-    perturbation_vector = np.zeros_like(x, dtype=np.float64)
-    x_min = np.minimum(x - lp_ori.l, lp_ori.u - x)
-    x_min[lp_ori.get_free_variables()] = 0  # free variables are not perturbed
-    # calculate the projector: (A X)^T (A X X A^T)† (A X) c
-    projector = apply_projector(lp_ori.A @ sp.diags(x_min), lp_ori.c)
-
-    # Compute the perturbation vector = scale_factor / x_min * np.random / ||np.random||, where scale_factor = ||projector|| / CONSTANT_SCALE_FACTOR * n
-    scale_factor = np.linalg.norm(projector) / (CONSTANT_SCALE_FACTOR * n)
-    p = np.random.uniform(0.5, 1, np.sum(x_min > PERTURB_THRESHOLD))
-    p = p / np.linalg.norm(p)
-    p = p / x_min[x_min > PERTURB_THRESHOLD] * scale_factor
-    perturbation_vector[x_min > PERTURB_THRESHOLD] = p
-
-    c_pt = lp_ori.c + perturbation_vector
-    return c_pt
-
-
-def perturb_b(lp_ori: GeneralLP,
-              y: np.ndarray) -> np.ndarray:
-    pass
-
-
-def get_perturb_problem(lp: GeneralLP,
-                        perturb_method: str,
-                        x: Optional[np.ndarray],
-                        y: Optional[np.ndarray]) -> LPManager:
-    """
-    Find an approximated optimal face using the given interior-point solution. And get the subproblem
-    restricted on that optimal face. Use the perturbed objective c_pt.
-
-    Args:
-        lp: the original LP problem in StandardLP format.
-        perturb_method: the perturbation method (choose from 'random', 'primal', 'dual').
-        x: the primal interior-point solution.
-        y: the dual interior-point solution.
-
-    Returns:
-        A LP manager of a sub-problem restricted on the approximated optimal face.
-
-    """
-
-    def get_dual_slack(A: sp.csr_matrix, c: np.ndarray, y: np.ndarray) -> np.ndarray:
-        return c - A.transpose() @ y
-
-    def get_primal_slack(A: sp.csr_matrix, b: np.ndarray, x: np.ndarray) -> np.ndarray:
-        return b - A @ x
-
-    BETA = 1e-2
-
-    s_d = get_dual_slack(lp.A, lp.c, y)
-    s_p = get_primal_slack(lp.A, lp.b, x)
-
-    subLP_manager = LPManager(lp.copy())
-    subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s_d)[0],
-                                ind_fix_to_up=np.where(lp.u - x < BETA * -s_d)[0])
-    subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < BETA * -y)[0])
-    subLP_manager.update_subproblem()
-
-    if perturb_method == 'primal':
-        c_perturbed = perturb_c(subLP_manager.lp_sub, subLP_manager.get_subx(x))
-        subLP_manager.update_c(c_perturbed)
-    elif perturb_method == 'dual':
-        b_perturb = perturb_b(lp, y)
-        subLP_manager.update_b(b_perturb)
-    else:
-        raise ValueError("The perturbation method is not supported.")
-
-    return subLP_manager
-
-
 def run_perturb_algorithm(lp: GeneralLP,
                           perturb_method: str,
                           solver: str = "GRB",
@@ -146,3 +53,112 @@ def run_perturb_algorithm(lp: GeneralLP,
                   obj_val=final_output.obj_val,
                   runtime=barrier_output.runtime + perturb_barrier_output.runtime + final_output.runtime,
                   iter_count=perturb_barrier_output.iter_count + final_output.iter_count)
+
+
+def get_perturb_problem(lp: GeneralLP,
+                        perturb_method: str,
+                        x: Optional[np.ndarray],
+                        y: Optional[np.ndarray]) -> LPManager:
+    """
+    Find an approximated optimal face using the given interior-point solution. And get the subproblem
+    restricted on that optimal face. Use the perturbed objective c_pt.
+
+    Args:
+        lp: the original LP problem in StandardLP format.
+        perturb_method: the perturbation method (choose from 'random', 'primal', 'dual').
+        x: the primal interior-point solution.
+        y: the dual interior-point solution.
+
+    Returns:
+        A LP manager of a sub-problem restricted on the approximated optimal face.
+
+    """
+
+    def get_dual_slack(A: sp.csr_matrix, c: np.ndarray, y: np.ndarray) -> np.ndarray:
+        return c - A.transpose() @ y
+
+    def get_primal_slack(A: sp.csr_matrix, b: np.ndarray, x: np.ndarray) -> np.ndarray:
+        return b - A @ x
+
+    BETA = 1e-2
+
+    s_d = get_dual_slack(lp.A, lp.c, y)
+    s_p = get_primal_slack(lp.A, lp.b, x)
+
+    subLP_manager = LPManager(lp.copy())
+    subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s_d)[0],
+                                ind_fix_to_up=np.where(lp.u - x < BETA * -s_d)[0])
+    subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < BETA * -y)[0])
+    subLP_manager.update_subproblem()
+
+    if perturb_method == 'primal':
+        subLP_manager.update_c(perturb_c(subLP_manager.lp_sub, subLP_manager.get_subx(x)))
+    elif perturb_method == 'dual':
+        subLP_manager.update_b(perturb_b(lp, y))
+    else:
+        raise ValueError("The perturbation method is not supported.")
+
+    return subLP_manager
+
+
+
+def perturb_c(lp_ori: GeneralLP,
+              x: np.ndarray) -> np.ndarray:
+    """
+    Perturb the input array `c` based on the interior-point solution `x`.
+
+    Args:
+        lp_ori: The original LP.
+        x: An interior-point solution used to generate the perturbation.
+
+    Returns:
+        Perturbed cost vector.
+
+    """
+    PERTURB_THRESHOLD = 1e-6
+    n = len(x)
+
+    perturbation_vector = np.zeros_like(x, dtype=np.float64)
+
+    x_real = get_x_perturb_val(lp_ori, x)
+    # Compute the perturbation vector = scale_factor / x_real * np.random / ||np.random||.
+    p = np.random.uniform(0.5, 1, np.sum(x_real > PERTURB_THRESHOLD))
+    p = p / np.linalg.norm(p)
+    p = p / x_real[x_real > PERTURB_THRESHOLD] * get_scale_factor(get_projector_c(lp_ori, x), n)
+    perturbation_vector[x_real > PERTURB_THRESHOLD] = p
+
+    c_pt = lp_ori.c + perturbation_vector
+    return c_pt
+
+
+def get_projector_c(lp_ori: GeneralLP,
+                    x: np.ndarray) -> np.ndarray:
+    """Get the projector of c."""
+    def apply_projector(Y, c, tol=1e-8, max_iter=1000):
+        """ Apply the projection matrix (I - Y^T (Y Y^T)† Y) to a vector c using conjugate gradient method. """
+        Yc = Y @ c
+        z, _ = splinalg.cg(Y @ Y.T, Yc, tol=tol, maxiter=max_iter)
+        return c - Y.T @ z
+
+    # calculate the projector: [I - (A X)^T (A X X A^T)† (A X)] c
+    return apply_projector(lp_ori.A @ sp.diags(get_x_perturb_val(lp_ori, x)), lp_ori.c)
+
+
+def get_scale_factor(projector: np.ndarray, n: int) -> float:
+    """Get the scale factor for perturbation."""
+    # scale_factor = ||projector|| / (CONSTANT_SCALE_FACTOR * n)
+    CONSTANT_SCALE_FACTOR = 1e-2
+    return np.linalg.norm(projector) / (CONSTANT_SCALE_FACTOR * n)
+
+
+def get_x_perturb_val(lp: GeneralLP,
+                      x: np.ndarray) -> np.ndarray:
+    """Get the x values used for perturbation estimation."""
+    x_min = np.minimum(x - lp.l, lp.u - x)
+    x_min[lp.get_free_variables()] = 0  # free variables are not perturbed
+    return x_min
+
+
+def perturb_b(lp_ori: GeneralLP,
+              y: np.ndarray) -> np.ndarray:
+    pass
