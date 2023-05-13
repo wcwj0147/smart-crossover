@@ -50,7 +50,7 @@ class LPManager:
             return
         self.lp_sub = GeneralLP(
             A=self.lp.A[:, self.var_info['non_fix']],
-            b=self.lp.b - self.lp.A[:, self.var_info['fix_up']] @ self.lp.u[self.var_info['fix_up']] + self.lp.A[:, self.var_info['fix_low']] @ self.lp.l[self.var_info['fix_low']],
+            b=self.lp.b - self.lp.A[:, self.var_info['fix_up']] @ self.lp.u[self.var_info['fix_up']] - self.lp.A[:, self.var_info['fix_low']] @ self.lp.l[self.var_info['fix_low']],
             c=self.lp.c[self.var_info['non_fix']],
             l=self.lp.l[self.var_info['non_fix']],
             u=self.lp.u[self.var_info['non_fix']],
