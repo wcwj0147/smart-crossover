@@ -107,7 +107,7 @@ def run_perturb_algorithm(lp: GeneralLP,
                           solver: str = "GRB",
                           barrierTol: float = 1e-8,
                           optimalityTol: float = 1e-6,
-                          log_file_head: str = '') -> Output:
+                          log_file: str = '') -> Output:
     """
 
     Args:
@@ -124,17 +124,17 @@ def run_perturb_algorithm(lp: GeneralLP,
     """
     barrier_output = solve_lp(lp, solver,
                               method='barrier',
-                              settings=SolverSettings(barrierTol=barrierTol, presolve='on', crossover='off', log_file=log_file_head+'_ori_bar.log'))
+                              settings=SolverSettings(barrierTol=barrierTol, presolve='on', crossover='off', log_file=log_file))
 
     perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, barrier_output.y)
 
     perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
                                       method='barrier',
-                                      settings=SolverSettings(barrierTol=barrierTol, presolve="on", log_file=log_file_head+'_ptb_bar.log'))
+                                      settings=SolverSettings(barrierTol=barrierTol, presolve="on", log_file=log_file))
 
     final_output = solve_lp(lp, solver=solver,
                             method='primal_simplex',
-                            settings=SolverSettings(presolve="on", optimalityTol=optimalityTol, log_file=log_file_head+'_final.log'),
+                            settings=SolverSettings(presolve="on", optimalityTol=optimalityTol, log_file=log_file),
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y),
                             warm_start_basis=perturbLP_manager.recover_basis_from_sub_basis(perturb_barrier_output.basis))
