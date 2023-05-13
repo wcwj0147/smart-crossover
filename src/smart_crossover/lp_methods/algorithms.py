@@ -40,9 +40,10 @@ def perturb_c(lp_ori: GeneralLP,
     # calculate the projector: (A X)^T (A X X A^T)† (A X) c
     projector = apply_projector(lp_ori.A @ sp.diags(x_min), lp_ori.c)
 
-    # Compute the perturbation vector = scale_factor * np.random / x_min, where scale_factor = ||projector|| / CONSTANT_SCALE_FACTOR * n
+    # Compute the perturbation vector = scale_factor / x_min * np.random / ||np.random||, where scale_factor = ||projector|| / CONSTANT_SCALE_FACTOR * n
     scale_factor = np.linalg.norm(projector) / (CONSTANT_SCALE_FACTOR * n)
     p = np.random.uniform(0.5, 1, np.sum(x_min > PERTURB_THRESHOLD))
+    p = p / np.linalg.norm(p)
     p = p / x_min[x_min > PERTURB_THRESHOLD] * scale_factor
     perturbation_vector[x_min > PERTURB_THRESHOLD] = p
 
