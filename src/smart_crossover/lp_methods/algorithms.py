@@ -179,10 +179,7 @@ def check_perturb_output_precision(sublp_manager: LPManager,
 
     x = sublp_manager.get_orix(x_ptb)
     primal_dual_gap = abs(c_ori @ x - barrier_obj)
-    if abs(barrier_obj) < 1:
-        relative_primal_dual_gap = primal_dual_gap
-    else:
-        relative_primal_dual_gap = primal_dual_gap / abs(barrier_obj)
+    relative_primal_dual_gap = primal_dual_gap / (abs(barrier_obj) + 1)
     logging.critical("  Primal-dual gap: %(gap).2e", {'gap': relative_primal_dual_gap})
     if relative_primal_dual_gap < PRIMAL_DUAL_GAP_THRESHOLD:
         return True
