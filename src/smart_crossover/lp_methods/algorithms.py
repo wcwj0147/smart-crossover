@@ -42,6 +42,8 @@ def run_perturb_algorithm(lp: GeneralLP,
                                       method='barrier',
                                       settings=SolverSettings(barrierTol=barrierTol, presolve="on", log_file=log_file))
 
+    check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, barrier_output.y, lp.b, lp.c)
+
     final_output = solve_lp(lp, solver=solver,
                             method='primal_simplex',
                             settings=SolverSettings(presolve="on", optimalityTol=optimalityTol, log_file=log_file),
@@ -102,7 +104,6 @@ def get_perturb_problem(lp: GeneralLP,
     return subLP_manager
 
 
-
 def perturb_c(lp_ori: GeneralLP,
               x: np.ndarray) -> np.ndarray:
     """
@@ -126,11 +127,11 @@ def perturb_c(lp_ori: GeneralLP,
     p = np.random.uniform(0.5, 1, np.sum(x_real > PERTURB_THRESHOLD))
     p = p / np.linalg.norm(p)
     projector = get_projector_c(lp_ori, x)
-    scale_factor = get_scale_factor(projector, n)
+    scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp_ori.sense == '<'))
     p = p / x_real[x_real > PERTURB_THRESHOLD] * scale_factor
     perturbation_vector[x_real > PERTURB_THRESHOLD] = p
 
-    logging.info("  Projector: %{pj}s,  Scale factor: %{sf}", {'pj': np.linalg.norm(projector), 'sf': scale_factor})
+    logging.critical("  Projector: %(pj)s, \n  Scale factor: %(sf)s", {'pj': np.linalg.norm(projector), 'sf': scale_factor})
 
     c_pt = lp_ori.c + perturbation_vector
     return c_pt
@@ -167,3 +168,18 @@ def get_x_perturb_val(lp: GeneralLP,
 def perturb_b(lp_ori: GeneralLP,
               y: np.ndarray) -> np.ndarray:
     pass
+
+
+def check_perturb_output_precision(sublp_manager: LPManager,
+                                   x_ptb: np.ndarray,
+                                   y_bar: np.ndarray,
+                                   b_ori: np.ndarray,
+                                   c_ori: np.ndarray) -> bool:
+    """Check if the perturbation is precise enough."""
+    PRIMAL_DUAL_GAP_THRESHOLD = 1e-6
+
+    x = sublp_manager.get_orix(x_ptb)
+    primal_dual_gap = abs(c_ori @ x - b_ori @ y_bar)
+    logging.critical("  Primal-dual gap: %(gap).2e", {'gap': primal_dual_gap})
+    if primal_dual_gap < PRIMAL_DUAL_GAP_THRESHOLD:
+        return True

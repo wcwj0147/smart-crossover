@@ -79,6 +79,14 @@ class LPManager:
         """ Get the solution of the sub problem from the solution of the current LP. """
         return x[self.var_info['non_fix']]
 
+    def get_orix(self, x_sub: np.ndarray) -> np.ndarray:
+        """ Get the solution of the current LP from the solution of the sub problem. """
+        x = np.zeros(self.lp.c.size)
+        x[self.var_info['non_fix']] = x_sub
+        x[self.var_info['fix_up']] = self.lp.u[self.var_info['fix_up']]
+        x[self.var_info['fix_low']] = self.lp.l[self.var_info['fix_low']]
+        return x
+
     def update_c(self, c_sub_new: np.ndarray) -> None:
         """ Update the objective function of the current LP. """
         self.lp.c[self.var_info['non_fix']] = c_sub_new
