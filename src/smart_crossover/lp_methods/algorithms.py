@@ -81,7 +81,7 @@ def get_perturb_problem(lp: GeneralLP,
     def get_primal_slack(A: sp.csr_matrix, b: np.ndarray, x: np.ndarray) -> np.ndarray:
         return b - A @ x
 
-    BETA = 1e-2
+    BETA = 1e-3
 
     s_d = get_dual_slack(lp.A, lp.c, y)
     s_p = get_primal_slack(lp.A, lp.b, x)
