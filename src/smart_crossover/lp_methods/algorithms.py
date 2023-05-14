@@ -42,7 +42,7 @@ def run_perturb_algorithm(lp: GeneralLP,
                                       method='barrier',
                                       settings=SolverSettings(barrierTol=barrierTol, presolve="on", log_file=log_file))
 
-    check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, barrier_output.y, lp.b, lp.c)
+    check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, lp.c, barrier_output.obj_val)
 
     final_output = solve_lp(lp, solver=solver,
                             method='primal_simplex',
@@ -172,14 +172,17 @@ def perturb_b(lp_ori: GeneralLP,
 
 def check_perturb_output_precision(sublp_manager: LPManager,
                                    x_ptb: np.ndarray,
-                                   y_bar: np.ndarray,
-                                   b_ori: np.ndarray,
-                                   c_ori: np.ndarray) -> bool:
+                                   c_ori: np.ndarray,
+                                   barrier_obj: float) -> bool:
     """Check if the perturbation is precise enough."""
     PRIMAL_DUAL_GAP_THRESHOLD = 1e-6
 
     x = sublp_manager.get_orix(x_ptb)
-    primal_dual_gap = abs(c_ori @ x - b_ori @ y_bar)
-    logging.critical("  Primal-dual gap: %(gap).2e", {'gap': primal_dual_gap})
-    if primal_dual_gap < PRIMAL_DUAL_GAP_THRESHOLD:
+    primal_dual_gap = abs(c_ori @ x - barrier_obj)
+    if abs(barrier_obj) < 1e-10:
+        relative_primal_dual_gap = primal_dual_gap
+    else:
+        relative_primal_dual_gap = primal_dual_gap / abs(barrier_obj)
+    logging.critical("  Primal-dual gap: %(gap).2e", {'gap': relative_primal_dual_gap})
+    if relative_primal_dual_gap < PRIMAL_DUAL_GAP_THRESHOLD:
         return True
