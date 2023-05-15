@@ -35,13 +35,13 @@ class CplCaller(SolverCaller):
         self.read_stdlp(mcf)
 
     def read_genlp(self, genlp: GeneralLP) -> None:
-        genlp.A = genlp.A.tocoo()
+        A_coo = genlp.A.tocoo()
         self.model.variables.add(obj=genlp.c.tolist(), ub=genlp.u.tolist(), lb=genlp.l.tolist(), names=['x_{}'.format(i) for i in range(genlp.c.size)])
 
         sense_cpl = ['E' if sense == '=' else 'L' if sense == '<' else 'G' for sense in genlp.sense]
-        a_rows = genlp.A.row.tolist()
-        a_cols = genlp.A.col.tolist()
-        a_vals = genlp.A.data
+        a_rows = A_coo.row.tolist()
+        a_cols = A_coo.col.tolist()
+        a_vals = A_coo.data
         self.model.linear_constraints.add(rhs=genlp.b, senses=sense_cpl)
         self.model.linear_constraints.set_coefficients(zip(a_rows, a_cols, a_vals))
 
