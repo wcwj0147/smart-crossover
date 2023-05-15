@@ -35,7 +35,7 @@ class CplCaller(SolverCaller):
         self.read_stdlp(mcf)
 
     def read_genlp(self, genlp: GeneralLP) -> None:
-        genlp.A = genlp.A.tocsr()
+        genlp.A = genlp.A.tocoo()
         self.model.variables.add(obj=genlp.c.tolist(), ub=genlp.u.tolist(), lb=genlp.l.tolist(), names=['x_{}'.format(i) for i in range(genlp.c.size)])
 
         sense_cpl = ['E' if sense == '=' else 'L' if sense == '<' else 'G' for sense in genlp.sense]
@@ -201,6 +201,8 @@ class CplCaller(SolverCaller):
     def _set_log(self) -> None:
         self.model.parameters.simplex.display.set(1)
         self.model.parameters.barrier.display.set(1)
+        if self.settings.log_file == '':
+            return
         self.model.set_results_stream(self.settings.log_file)
         self.model.set_log_stream(self.settings.log_file)
 
