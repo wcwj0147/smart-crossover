@@ -25,20 +25,11 @@ class CplCaller(SolverCaller):
         stdlp.A = stdlp.A.tocsr()
         self.model.variables.add(obj=stdlp.c.tolist(), ub=stdlp.u.tolist(), names=['x_{}'.format(i) for i in range(stdlp.c.size)])
 
-        # Precompute variable names
-        var_names = ['x_{}'.format(i) for i in range(stdlp.A.shape[1])]
-        constraint_names = ['Ax_{}'.format(i) for i in range(stdlp.A.shape[0])]
-        nonzero_ind = [stdlp.A.indices[stdlp.A.indptr[i]:stdlp.A.indptr[i + 1]] for i in range(stdlp.A.shape[0])]
-
-        # Add constraints
-        self.model.linear_constraints.add(
-            lin_expr=[
-                cplex.SparsePair(ind=[var_names[j] for j in nonzero_ind[i]], val=[stdlp.A[i, j] for j in nonzero_ind[i]])
-                for i in range(stdlp.A.shape[0])],
-            senses=['E' for _ in range(stdlp.A.shape[0])],
-            rhs=stdlp.b,
-            names=constraint_names
-        )
+        a_rows = stdlp.A.row.tolist()
+        a_cols = stdlp.A.col.tolist()
+        a_vals = stdlp.A.data
+        self.model.linear_constraints.add(rhs=stdlp.b, senses=['E'] * stdlp.b.size)
+        self.model.linear_constraints.set_coefficients(zip(a_rows, a_cols, a_vals))
 
     def read_mcf(self, mcf: MinCostFlow) -> None:
         self.read_stdlp(mcf)
@@ -47,34 +38,22 @@ class CplCaller(SolverCaller):
         genlp.A = genlp.A.tocsr()
         self.model.variables.add(obj=genlp.c.tolist(), ub=genlp.u.tolist(), lb=genlp.l.tolist(), names=['x_{}'.format(i) for i in range(genlp.c.size)])
 
-        # Precompute variable names
-        var_names = ['x_{}'.format(i) for i in range(genlp.A.shape[1])]
-        constraint_names = ['Ax_{}'.format(i) for i in range(genlp.A.shape[0])]
-        nonzero_ind = [genlp.A.indices[genlp.A.indptr[i]:genlp.A.indptr[i + 1]] for i in range(genlp.A.shape[0])]
-
-        # Add constraints
-        self.model.linear_constraints.add(
-            lin_expr=[
-                cplex.SparsePair(ind=[var_names[j] for j in nonzero_ind[i]], val=[genlp.A[i, j] for j in nonzero_ind[i]])
-                for i in range(genlp.A.shape[0])],
-            senses=['E' if genlp.sense[i] == '=' else 'L' if genlp.sense[i] == '<' else 'G' for i in range(genlp.A.shape[0])],
-            rhs=genlp.b,
-            names=constraint_names
-        )
+        sense_cpl = ['E' if sense == '=' else 'L' if sense == '<' else 'G' for sense in genlp.sense]
+        a_rows = genlp.A.row.tolist()
+        a_cols = genlp.A.col.tolist()
+        a_vals = genlp.A.data
+        self.model.linear_constraints.add(rhs=genlp.b, senses=sense_cpl)
+        self.model.linear_constraints.set_coefficients(zip(a_rows, a_cols, a_vals))
 
     def get_A(self) -> sp.csr_matrix:
         num_rows = self.model.linear_constraints.get_num()
         num_cols = self.model.variables.get_num()
 
-        row_indices = []
-        col_indices = []
-        values = []
+        all_constraints = self.model.linear_constraints.get_rows()
 
-        for i in range(num_rows):
-            sparse_pair = self.model.linear_constraints.get_rows(i)
-            row_indices.extend([i] * len(sparse_pair.ind))
-            col_indices.extend(sparse_pair.ind)
-            values.extend(sparse_pair.val)
+        row_indices = np.repeat(range(num_rows), [len(constraint.ind) for constraint in all_constraints])
+        col_indices = np.concatenate([constraint.ind for constraint in all_constraints])
+        values = np.concatenate([constraint.val for constraint in all_constraints])
 
         A_coo = sp.coo_matrix((values, (row_indices, col_indices)), shape=(num_rows, num_cols))
 
