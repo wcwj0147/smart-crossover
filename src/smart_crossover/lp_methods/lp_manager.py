@@ -99,3 +99,11 @@ class LPManager:
     def fix_constraints(self, ind_fix_to_up: np.ndarray) -> None:
         """ Fix some constraints to upper bounds in the sub problem. """
         self.fixed_constraints = ind_fix_to_up
+
+    def get_num_fixed_variables(self) -> int:
+        """ Get the number of fixed variables in the sub problem. """
+        return self.var_info['fix'].size
+
+    def get_num_fixed_constraints(self) -> int:
+        """ Get the number of fixed constraints in the sub problem. """
+        return self.fixed_constraints.size

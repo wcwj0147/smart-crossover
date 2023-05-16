@@ -91,6 +91,9 @@ def get_perturb_problem(lp: GeneralLP,
     subLP_manager = LPManager(lp.copy())
     subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s_d)[0],
                                 ind_fix_to_up=np.where(lp.u - x < BETA * -s_d)[0])
+    logging.critical("The number of fixed variables is %d." % subLP_manager.get_num_fixed_variables())
+    logging.critical("The number of fixed constraints is %d." % subLP_manager.get_num_fixed_constraints())
+
     subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < BETA * -y)[0])
     subLP_manager.update_subproblem()
 
