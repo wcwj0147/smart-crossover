@@ -45,7 +45,7 @@ def run_perturb_algorithm(lp: GeneralLP,
     check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, lp.c, barrier_output.obj_val)
 
     final_output = solve_lp(lp, solver=solver,
-                            method='primal_simplex',
+                            method='simplex' if solver == 'MSK' else 'primal_simplex',
                             settings=SolverSettings(presolve="on", optimalityTol=optimalityTol, log_file=log_file),
                             warm_start_solution=(perturbLP_manager.recover_x_from_sub_x(perturb_barrier_output.x),
                                                  perturb_barrier_output.y),
@@ -91,8 +91,8 @@ def get_perturb_problem(lp: GeneralLP,
     subLP_manager = LPManager(lp.copy())
     subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s_d)[0],
                                 ind_fix_to_up=np.where(lp.u - x < BETA * -s_d)[0])
-    logging.critical("The number of fixed variables is %d." % subLP_manager.get_num_fixed_variables())
-    logging.critical("The number of fixed constraints is %d." % subLP_manager.get_num_fixed_constraints())
+    logging.critical("  The number of fixed variables is %d." % subLP_manager.get_num_fixed_variables())
+    logging.critical("  The number of fixed constraints is %d." % subLP_manager.get_num_fixed_constraints())
 
     subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < BETA * -y)[0])
     subLP_manager.update_subproblem()
@@ -130,7 +130,7 @@ def perturb_c(lp_ori: GeneralLP,
     np.random.seed(42)
     p = np.random.uniform(0.9, 1, np.sum(x_real > PERTURB_THRESHOLD))
     p = p / np.linalg.norm(p)
-    projector = get_projector_c(lp_ori, x)
+    projector = get_projector_c(lp_ori, x_real)
     scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp_ori.sense == '<'))
     p = p / x_real[x_real > PERTURB_THRESHOLD] * scale_factor
     perturbation_vector[x_real > PERTURB_THRESHOLD] = p
