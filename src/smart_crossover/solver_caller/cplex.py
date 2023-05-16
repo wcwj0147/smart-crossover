@@ -42,7 +42,7 @@ class CplCaller(SolverCaller):
         a_rows = A_coo.row.tolist()
         a_cols = A_coo.col.tolist()
         a_vals = A_coo.data
-        self.model.linear_constraints.add(rhs=genlp.b, senses=sense_cpl)
+        self.model.linear_constraints.add(rhs=genlp.b, senses=sense_cpl, names=['c_{}'.format(i) for i in range(genlp.b.size)])
         self.model.linear_constraints.set_coefficients(zip(a_rows, a_cols, a_vals))
 
     def get_A(self) -> sp.csr_matrix:
