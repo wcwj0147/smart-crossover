@@ -80,7 +80,7 @@ class CplCaller(SolverCaller):
                              basis: Basis) -> None:
         s = self.model.start.status
         col_status = [s.basic if basis.vbasis[i] == 0 else s.at_lower_bound if basis.vbasis[i] == -1 else s.at_upper_bound if basis.vbasis[i] == -2 else s.free_nonbasic for i in range(len(basis.vbasis))]
-        row_status = [s.basic if basis.cbasis[i] == 0 else s.at_lower_bound for i in range(len(basis.cbasis))]
+        row_status = [s.basic if basis.cbasis[i] == 0 else s.at_lower_bound if basis.cbasis[i] == -1 else s.at_upper_bound if basis.cbasis[i] == -2 else s.free_nonbasic for i in range(len(basis.cbasis))]
         self.model.start.set_start(col_status=col_status, row_status=row_status, col_primal=[], row_primal=[], col_dual=[], row_dual=[])
 
     def add_warm_start_solution(self,
@@ -94,8 +94,8 @@ class CplCaller(SolverCaller):
         basis_status = self.model.solution.basis.get_basis()
         col_status = basis_status[0]
         row_status = basis_status[1]
-        vbasis = np.array([s.basic if col_status[i] == 0 else s.at_lower_bound if col_status[i] == -1 else s.at_upper_bound if col_status[i] == -2 else s.free_nonbasic for i in range(len(col_status))])
-        cbasis = np.array([s.basic if row_status[i] == 0 else s.at_lower_bound for i in range(len(row_status))])
+        vbasis = np.array([0 if col_status[i] == s.basic else -1 if col_status[i] == s.at_lower_bound else -2 if col_status[i] == s.at_upper_bound else -3 for i in range(len(col_status))])
+        cbasis = np.array([0 if row_status[i] == s.basic else -1 if row_status[i] == s.at_lower_bound else -2 if row_status[i] == s.at_upper_bound else -3 for i in range(len(row_status))])
         return Basis(vbasis=vbasis, cbasis=cbasis)
 
     def return_x(self) -> np.ndarray:
