@@ -1,10 +1,12 @@
 import os
 import pickle
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 
 import gurobipy
+from matplotlib import pyplot as plt
 
 from smart_crossover import get_project_root
+from smart_crossover.formats import GeneralLP
 from smart_crossover.solver_caller.gurobi import GrbCaller
 
 
@@ -64,14 +66,37 @@ class FileHandler:
             presolved_model.ModelName = model.ModelName
             presolved_model.write(path + f"/{model.ModelName}.mps")
 
-    def get_models_report(self) -> str:
+    def get_models_report(self, *args: Union[List[str], str]) -> str:
         """ Get a report string of models. """
         report_str = "\n****** Reports about models' info ******\n"
-        for model in self.models:
+        model_names = [name for arg in args for name in (arg if isinstance(arg, list) else [arg])]
+        models = self.models if not model_names else [self.get_model_by_name(name) for name in model_names]
+        for model in models:
             self.grbCaller.read_model(model)
             report_str += self.grbCaller.get_model_report()
             report_str += "\n"
         return report_str
+
+    def get_model_by_name(self, model_name: str) -> gurobipy.Model:
+        """ Get a model by its name."""
+        for model in self.models:
+            if model.ModelName == model_name:
+                return model
+        raise ValueError(f"Model {model_name} not found.")
+
+    def get_lp_by_name(self, model_name: str) -> GeneralLP:
+        """ Get a model by its name."""
+        model = self.get_model_by_name(model_name)
+        self.grbCaller.read_model(model)
+        return self.grbCaller.return_genlp()
+
+    def plot_A_mat(self, name: str) -> None:
+        lp = self.get_lp_by_name(name)
+        A = lp.A
+        plt.figure(figsize=(12, 12))
+        plt.spy(A, markersize=0.1)
+        plt.show()
+        return
 
 
 def read_results_from_pickle(path: str) -> Any:
