@@ -202,8 +202,9 @@ class CplCaller(SolverCaller):
         self.model.parameters.simplex.display.set(1)
         self.model.parameters.barrier.display.set(1)
         if self.settings.log_file != '':
-            self.model.set_results_stream(self.settings.log_file)
-            self.model.set_log_stream(self.settings.log_file)
+            log_file = open(self.settings.log_file, 'a')  # Open the file in append mode
+            self.model.set_results_stream(log_file)
+            self.model.set_log_stream(log_file)
 
     def _set_time_limit(self) -> None:
         self.model.parameters.setTimeLimit = self.settings.timeLimit
