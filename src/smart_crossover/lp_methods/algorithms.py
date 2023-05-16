@@ -40,7 +40,7 @@ def run_perturb_algorithm(lp: GeneralLP,
 
     perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
                                       method='barrier',
-                                      settings=SolverSettings(barrierTol=barrierTol, presolve="on", log_file=log_file))
+                                      settings=SolverSettings(presolve="on", log_file=log_file))
 
     check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, lp.c, barrier_output.obj_val)
 
@@ -124,7 +124,8 @@ def perturb_c(lp_ori: GeneralLP,
 
     x_real = get_x_perturb_val(lp_ori, x)
     # Compute the perturbation vector = scale_factor / x_real * np.random / ||np.random||.
-    p = np.random.uniform(0.5, 1, np.sum(x_real > PERTURB_THRESHOLD))
+    np.random.seed(42)
+    p = np.random.uniform(0.9, 1, np.sum(x_real > PERTURB_THRESHOLD))
     p = p / np.linalg.norm(p)
     projector = get_projector_c(lp_ori, x)
     scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp_ori.sense == '<'))
