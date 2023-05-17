@@ -151,7 +151,7 @@ def get_projector_c(lp_ori: GeneralLP,
         return c - Y.T @ z
 
     # calculate the projector: [I - (A X)^T (A X X A^T)† (A X)] c
-    return apply_projector(lp_ori.A @ sp.diags(get_x_perturb_val(lp_ori, x)), lp_ori.c)
+    return apply_projector(lp_ori.A @ sp.diags(x), lp_ori.c)
 
 
 def get_scale_factor(projector: np.ndarray, n: int) -> float:
