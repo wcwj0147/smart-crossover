@@ -69,7 +69,7 @@ class GrbCaller(SolverCaller):
                              basis: Basis) -> None:
         self.model.setAttr("VBasis", self.model.getVars(), basis.vbasis.tolist())
         self.model.setAttr("CBasis", self.model.getConstrs(), basis.cbasis.tolist())
-        self.model.setParam("LPWarmStart", 2)  # Make warm-start basis work when conduct presolve.
+        # self.model.setParam("LPWarmStart", 2)  # Make warm-start basis work when conduct presolve.
 
     def add_warm_start_solution(self,
                                 start_solution: Tuple[np.ndarray, np.ndarray]):

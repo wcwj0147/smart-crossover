@@ -18,60 +18,26 @@ def tree_basis_identify(ot_manager: OTManager, flow_weights: np.ndarray) -> Tupl
     return tree_basis, push_iter
 
 
-class UnionFind:
-    def __init__(self, n: int):
-        self.parent = list(range(n))
-        self.rank = [0] * n
-
-    def find(self, x: int) -> int:
-        if self.parent[x] != x:
-            self.parent[x] = self.find(self.parent[x])
-        return self.parent[x]
-
-    def unite(self, x: int, y: int) -> None:
-        x_root = self.find(x)
-        y_root = self.find(y)
-
-        if x_root == y_root:
-            return
-
-        if self.rank[x_root] < self.rank[y_root]:
-            self.parent[x_root] = y_root
-        elif self.rank[x_root] > self.rank[y_root]:
-            self.parent[y_root] = x_root
-        else:
-            self.parent[y_root] = x_root
-            self.rank[x_root] += 1
-
-
 def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.ndarray:
-    def edge_list() -> List[Tuple[int, int, float, int]]:
-        edges_list = []
-        n_rows, n_cols = ot.M.shape
-        for i in range(n_rows):
-            for j in range(n_cols):
-                ind = i * n_cols + j
-                edges_list.append((i, j + n_rows, flow_weights[ind], ind))
-        return edges_list
+    """ Find the maximum weight spanning tree of the graph defined by the OT problem using scipy.sparse.csgraph. """
+    s_num, d_num = ot.M.shape
+    total_node_num = s_num + d_num
 
-    edges = edge_list()
-    edges.sort(key=lambda edge: edge[2], reverse=True)
+    row = np.repeat(np.arange(s_num), d_num)
+    col = np.tile(np.arange(s_num, total_node_num), s_num)
+    data = -flow_weights  # negate the weights to find max spanning tree
 
-    n = ot.s.size + ot.d.size
-    uf = UnionFind(n)
-    tree_edges = np.full(n - 1, -1, dtype=np.int_)
+    # Construct sparse matrix
+    sparse_graph = sp.coo_matrix((data, (row, col)), shape=(total_node_num, total_node_num))
 
-    edge_count = 0
-    for edge in edges:
-        u, v, weight, index = edge
-        if uf.find(u) != uf.find(v):
-            uf.unite(u, v)
-            tree_edges[edge_count] = index
-            edge_count += 1
-            if edge_count == n - 1:
-                break
+    # compute minimum spanning tree
+    min_tree = sp.csgraph.minimum_spanning_tree(sparse_graph).toarray()
 
-    return tree_edges
+    # Compute the linear indices for the tree edges
+    tree_edges = np.flatnonzero(min_tree)
+    tree_edges_indices = tree_edges // total_node_num * d_num + tree_edges % total_node_num - s_num
+
+    return tree_edges_indices
 
 
 def push_tree_to_bfs(ot_manager: OTManager, tree: np.ndarray) -> Tuple[np.ndarray, int]:

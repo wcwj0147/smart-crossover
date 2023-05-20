@@ -19,7 +19,7 @@ def generate_solver_caller(solver: str = "GRB",
     elif solver == "MSK":
         caller = MskCaller(solver_settings)
     else:
-        raise ValueError("Invalid solver specified. Choose from 'GRB' or 'CPL'.")
+        raise ValueError("Invalid solver specified. Choose from 'GRB', 'CPL' and 'MSK'.")
     return caller
 
 

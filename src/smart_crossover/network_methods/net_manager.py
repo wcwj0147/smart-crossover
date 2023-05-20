@@ -221,7 +221,7 @@ class OTManager:
         s_appended = np.append(self.ot.s, np.sum(self.ot.d))
         d_appended = np.append(self.ot.d, np.sum(self.ot.s))
         M_appended = np.vstack([
-            np.hstack([self.ot.M, bigM * bigM * np.ones((self.ot.s.size, 1))]),
+            np.hstack([self.ot.M, bigM * np.ones((self.ot.s.size, 1))]),
             np.hstack([bigM * np.ones((1, self.ot.d.size)), np.array([[0]])])
         ])
         self.mask_sub_ot = np.vstack([
@@ -265,7 +265,7 @@ class OTManager:
         return mcf
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
-        method = "network_simplex" if solver == "CPL" or "MSK" else "default"
+        method = "network_simplex" if solver == "CPL" else "primal_simplex"
         return solve_mcf(self.get_sub_problem(), solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis), settings=solver_settings)
 
     def recover_obj_val(self, obj_val):
