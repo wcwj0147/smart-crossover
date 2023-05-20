@@ -33,7 +33,7 @@ def solve_problem(solver_caller: SolverCaller,
             solver_caller.add_warm_start_solution(warm_start_solution)
         if warm_start_basis is not None:
             solver_caller.add_warm_start_basis(warm_start_basis)
-        if method == "simplex" and solver_caller.solver_name == "MSK":
+        if method == "simplex":
             solver_caller.run_simplex()
         elif method == "network_simplex":
             solver_caller.run_network_simplex()
@@ -41,6 +41,8 @@ def solve_problem(solver_caller: SolverCaller,
             solver_caller.run_primal_simplex()
         elif method == "dual_simplex":
             solver_caller.run_dual_simplex()
+        elif method == "default":
+            solver_caller.run_default()
     elif method == "barrier":
         if settings.crossover == 'on':
             solver_caller.run_barrier()
