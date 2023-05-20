@@ -8,7 +8,7 @@ import scipy.sparse as sp
 from smart_crossover.formats import MinCostFlow
 
 
-def parse_min_file(file_path: str) -> MinCostFlow:
+def parse_min_file(file_path: str, name: str) -> MinCostFlow:
     with open(file_path, 'r') as f:
         lines = f.readlines()
 
@@ -37,7 +37,7 @@ def parse_min_file(file_path: str) -> MinCostFlow:
         c[i] = cost
         u[i] = upper
 
-    return MinCostFlow(A=A.tocsr(), b=b, c=c, u=u)
+    return MinCostFlow(A=A.tocsr(), b=b, c=c, u=u, name=name)
 
 
 def main():
@@ -51,13 +51,13 @@ def main():
     min_files = glob.glob(os.path.join(input_folder, "*.min"))
 
     for min_file in min_files:
-        # Process the .min file to a MinCostFlow instance
-        min_cost_flow = parse_min_file(min_file)
-
         # Save the MinCostFlow instance to the output folder with the same name (but with .mcf extension)
         basename = os.path.basename(min_file)
         new_name = os.path.splitext(basename)[0] + ".mcf"
         output_file = os.path.join(output_folder, new_name)
+
+        # Process the .min file to a MinCostFlow instance
+        min_cost_flow = parse_min_file(min_file, basename[:-4])
 
         with open(output_file, 'wb') as file:
             pickle.dump(min_cost_flow, file)
