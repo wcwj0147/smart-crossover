@@ -40,7 +40,7 @@ def create_cost_matrix(k: int) -> np.ndarray:
     return cost_matrix
 
 
-def make_opt_transport_instances(images: List[np.ndarray], cost_matrix: np.ndarray) -> List[OptTransport]:
+def make_opt_transport_instances(images: List[np.ndarray], cost_matrix: np.ndarray, k: int) -> List[OptTransport]:
     opt_transport_instances = []
     for i in range(0, len(images), 2):
         # Find non-zero indices for both images
@@ -55,7 +55,8 @@ def make_opt_transport_instances(images: List[np.ndarray], cost_matrix: np.ndarr
         M = cost_matrix[np.ix_(non_zero_indices_s[0], non_zero_indices_d[0])]
 
         # Create OptTransport instance with the non-zero elements and corresponding cost matrix
-        opt_transport_instance = OptTransport(s=s, d=d, M=M, name=f"ot_mnist_{i // 20}_{i // 2 % 10}")
+        opt_transport_instance = OptTransport(s=s, d=d, M=M, name=f"mnist_{k}_{i // 2 % 10}")
+        print(opt_transport_instance.name)
         opt_transport_instances.append(opt_transport_instance)
     return opt_transport_instances
 
@@ -63,7 +64,7 @@ def make_opt_transport_instances(images: List[np.ndarray], cost_matrix: np.ndarr
 def save_opt_transport_instances(opt_transport_instances: List[OptTransport], output_folder: str):
     os.makedirs(output_folder, exist_ok=True)
     for i, instance in enumerate(opt_transport_instances):
-        with open(os.path.join(output_folder, f"mnist_{i // 10}_{i % 10}.ot"), 'wb') as f:
+        with open(os.path.join(output_folder, f"mnist_{i // 10 + 1}_{i % 10}.ot"), 'wb') as f:
             pickle.dump(instance, f)
 
 
@@ -77,7 +78,7 @@ def main():
         selected_images = select_random_images(x_train)
         normalized_amplified_images = [normalize_and_amplify(img, k) for img in selected_images]
         cost_matrix = create_cost_matrix(k)
-        opt_transport_instances = make_opt_transport_instances(normalized_amplified_images, cost_matrix)
+        opt_transport_instances = make_opt_transport_instances(normalized_amplified_images, cost_matrix, k)
         all_opt_transport_instances.extend(opt_transport_instances)
 
     save_opt_transport_instances(all_opt_transport_instances, get_project_root() / "data/ot_mnist")
