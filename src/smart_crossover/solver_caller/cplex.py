@@ -22,12 +22,12 @@ class CplCaller(SolverCaller):
 
     def read_stdlp(self, stdlp: StandardLP) -> None:
         # Add variables
-        stdlp.A = stdlp.A.tocsr()
+        A_coo = stdlp.A.tocoo()
         self.model.variables.add(obj=stdlp.c.tolist(), ub=stdlp.u.tolist(), names=['x_{}'.format(i) for i in range(stdlp.c.size)])
 
-        a_rows = stdlp.A.row.tolist()
-        a_cols = stdlp.A.col.tolist()
-        a_vals = stdlp.A.data
+        a_rows = A_coo.row.tolist()
+        a_cols = A_coo.col.tolist()
+        a_vals = A_coo.data
         self.model.linear_constraints.add(rhs=stdlp.b, senses=['E'] * stdlp.b.size)
         self.model.linear_constraints.set_coefficients(zip(a_rows, a_cols, a_vals))
 
