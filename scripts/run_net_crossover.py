@@ -1,14 +1,15 @@
 import os
 import pickle
+from datetime import datetime
 from typing import List
 
 import numpy as np
+from ot import sinkhorn
 
 from smart_crossover import get_project_root
 from smart_crossover.filehandling import write_results_to_pickle
 from smart_crossover.formats import OptTransport, MinCostFlow
 from smart_crossover.network_methods.algorithms import network_crossover
-from smart_crossover.network_methods.sinkhorn import sinkhorn
 from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_mcf, solve_ot
 
@@ -67,14 +68,18 @@ def main(solver: str, problem: str, test_object: str, barrierTol: float):
 
             if test_object == 'total':
                 grb_output = solve_ot(ot, method='default', solver='GRB', settings=SolverSettings(presolve='off'))
-                cpl_output = solve_ot(ot, method='network_simplex', solver='CPL', settings=SolverSettings(presolve='off'))
-                sinkhorn_output = sinkhorn(ot, reg=100)
-                tnet_output = network_crossover(x=sinkhorn_output.x, ot=ot, method='tnet', solver='CPL', solver_settings=SolverSettings(presolve="off"))
-                cnet_output = network_crossover(x=sinkhorn_output.x, ot=ot, method='cnet_ot', solver='CPL', solver_settings=SolverSettings(presolve="off"))
+                cpl_output = solve_ot(ot, method='network_simplex', solver='CPL',
+                                      settings=SolverSettings(presolve='off'))
+                start = datetime.now()
+                sinkhorn_x = sinkhorn(ot.s, ot.d, ot.M, 1)
+                sinkhorn_runtime = datetime.now() - start
+                tnet_output = network_crossover(x=sinkhorn_x.flatten(), ot=ot, method='tnet', solver='CPL', solver_settings=SolverSettings(presolve="off"))
+                cnet_output = network_crossover(x=sinkhorn_x.flatten(), ot=ot, method='cnet_ot', solver='CPL', solver_settings=SolverSettings(presolve="off"))
                 results[ot.name] = {'grb': (grb_output.runtime, grb_output.iter_count),
                                     'cpl': (cpl_output.runtime, cpl_output.iter_count),
-                                    'sinkhorn': sinkhorn_output.runtime,
-                                    'cnet': (cnet_output.runtime, cnet_output.iter_count), 'tnet': (tnet_output.runtime, tnet_output.iter_count)}
+                                    'sinkhorn': sinkhorn_runtime,
+                                    'tnet': (tnet_output.runtime, tnet_output.iter_count),
+                                    'cnet': (cnet_output.runtime, cnet_output.iter_count)}
 
             if test_object == 'crossover':
                 barrier_output = solve_ot(ot, method='barrier', solver=solver, settings=SolverSettings(barrierTol=barrierTol, crossover='off', presolve='off'))
@@ -98,6 +103,6 @@ def main(solver: str, problem: str, test_object: str, barrierTol: float):
 
 
 if __name__ == "__main__":
-    # for test_object, barrierTol in [('crossover', 1e-2), ('crossover', 1e-8), ('solver', 1e-8)]:
-    #     main(solver='GRB', problem='ot', test_object=test_object, barrierTol=barrierTol)
-    main(solver='GRB', problem='ot', test_object='total', barrierTol=1e-2)
+    for test_object, barrierTol in [('crossover', 1e-2), ('crossover', 1e-8), ('solver', 1e-8)]:
+        main(solver='GRB', problem='ot', test_object=test_object, barrierTol=barrierTol)
+    # main(solver='GRB', problem='ot', test_object='total', barrierTol=1e-2)
