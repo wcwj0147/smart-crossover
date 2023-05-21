@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
+from smart_crossover import get_project_root
+
 
 def get_main_info_df(log_dir: Path, solver: str) -> pd.DataFrame:
     # Get list of all log files
@@ -168,15 +170,29 @@ def get_complete_df(log_dir: Path, log_file: Path, solver: str, simplified: bool
     return df
 
 
-def plot_df(df: pd.DataFrame) -> None:
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+def calculate_average_improvement(df: pd.DataFrame) -> float:
+    df['improvement'] = (df['Perturb'] + 10) / (df['Crossover(ori)'] + 10)
+    # calculate geometric mean
+    average_improvement = df['improvement'].prod() ** (1 / len(df))
+    df.drop('improvement', axis=1, inplace=True)
+    return average_improvement
+
+
+def plot_df(df: pd.DataFrame, path: str = '') -> None:
+    fig, ax1 = plt.subplots(figsize=(10, 5))
     color1, color2 = 'tab:blue', 'tab:orange'
+    plt.style.use('seaborn-whitegrid')
+    plt.rcParams['font.size'] = 14
+    plt.rcParams['axes.labelsize'] = 14
+    plt.rcParams['xtick.labelsize'] = 14
+    plt.rcParams['ytick.labelsize'] = 14
+    plt.rcParams['text.usetex'] = True
 
     # Create the bar chart
     ratio = df['Perturb'] / df['Crossover(ori)']
     ratio = pd.to_numeric(ratio, errors='coerce')
     bars = (-np.log10(ratio)).values
-    ax1.bar(df.index, bars, color=color1, alpha=1.0)
+    ax1.bar(df.index, bars, color=color1, alpha=1.0, width=1)
 
     # Create a second y-axis for the line chart
     ax2 = ax1.twinx()
@@ -188,7 +204,7 @@ def plot_df(df: pd.DataFrame) -> None:
     ax2.plot(df.index, line, color=color2)
 
     # Set axis labels
-    ax1.set_xlabel('Problem')
+    ax1.set_xlabel(r'$\it{optLP}$ benchmark problems')
     ax1.set_ylabel('Runtime Ratio (log scale)', color=color1)
     ax2.set_ylabel('Relative Gap (log scale)', color=color2)
 
@@ -196,11 +212,24 @@ def plot_df(df: pd.DataFrame) -> None:
     ax1.tick_params(axis='y', colors=color1)
     ax2.tick_params(axis='y', colors=color2)
 
-    ax1.set_ylim([-2, 4])
+    ax1.set_ylim([-1.5, 4])
     ax2.set_ylim([-16, 16])
+    # Hide x tick labels
+    plt.setp(ax1.get_xticklabels(), visible=False)
+
+    ax2.axhline(y=6, color='tab:orange', linestyle='--', alpha=0.5)
+
+    ax2.grid(False)
+
+    # ax1.set_xticks(np.arange(0, len(df.index), 5))
+    ax1.grid(True)
 
     # It's also a good practice to update the axes layout after making adjustments
     fig.tight_layout()
+
+    # Save the plot
+    if path:
+        fig.savefig(get_project_root() / 'results' / path)
 
     # Show the plot
     plt.show()
