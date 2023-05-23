@@ -46,4 +46,4 @@ def sinkhorn(ot_instance: OptTransport, reg: float = 0.2, num_iter: int = 1000, 
     P = np.diag(u) @ K @ np.diag(v)
 
     timer.end_timer()
-    return Output(obj_val=np.float64(np.sum(P*M)), x=P.ravel(), x_bar=P.ravel(), runtime=timer.total_duration)
+    return Output(x=P.ravel(), runtime=timer.total_duration)

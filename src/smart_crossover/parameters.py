@@ -5,7 +5,7 @@
 ###################################
 
 TOLERANCE_FOR_ARTIFICIAL_VARS = 1e-8
-TOLERANCE_FOR_REDUCED_COSTS = 1e-6
+TOLERANCE_FOR_REDUCED_COSTS = 1e-5
 
 
 #############################################################

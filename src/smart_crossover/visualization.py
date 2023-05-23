@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from smart_crossover import get_project_root
 
 
-def get_main_info_df(log_dir: Path, solver: str) -> pd.DataFrame:
+def get_main_info_df_lp(log_dir: Path, solver: str) -> pd.DataFrame:
     # Get list of all log files
     log_files = glob.glob(os.path.join(log_dir, "*.log"))
 
@@ -110,7 +110,7 @@ def get_main_info_df(log_dir: Path, solver: str) -> pd.DataFrame:
     return df
 
 
-def get_additional_info_df(log_file: Path) -> pd.DataFrame:
+def get_additional_info_df_lp(log_file: Path) -> pd.DataFrame:
     info = {}
     with open(log_file, 'r') as file:
         for line in file:
@@ -142,7 +142,7 @@ def get_additional_info_df(log_file: Path) -> pd.DataFrame:
     return df
 
 
-def get_merged_df(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
+def get_merged_df_lp(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     df1.reset_index(inplace=True)
     df2.reset_index(inplace=True)
     df1.rename(columns={'index': 'Problem'}, inplace=True)
@@ -151,10 +151,10 @@ def get_merged_df(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     return merged_df
 
 
-def get_complete_df(log_dir: Path, log_file: Path, solver: str, simplified: bool = False) -> pd.DataFrame:
-    df1 = get_main_info_df(log_dir, solver)
-    df2 = get_additional_info_df(log_file)
-    df = get_merged_df(df1, df2)
+def get_complete_df_lp(log_dir: Path, log_file: Path, solver: str, simplified: bool = False) -> pd.DataFrame:
+    df1 = get_main_info_df_lp(log_dir, solver)
+    df2 = get_additional_info_df_lp(log_file)
+    df = get_merged_df_lp(df1, df2)
 
     def format_sci(num):
         return "{:.1e}".format(num)
@@ -170,7 +170,7 @@ def get_complete_df(log_dir: Path, log_file: Path, solver: str, simplified: bool
     return df
 
 
-def calculate_average_improvement(df: pd.DataFrame) -> float:
+def calculate_average_improvement_lp(df: pd.DataFrame) -> float:
     df['improvement'] = (df['Perturb'] + 10) / (df['Crossover(ori)'] + 10)
     # calculate geometric mean
     average_improvement = df['improvement'].prod() ** (1 / len(df))
@@ -178,7 +178,7 @@ def calculate_average_improvement(df: pd.DataFrame) -> float:
     return average_improvement
 
 
-def plot_df(df: pd.DataFrame, path: str = '') -> None:
+def plot_df_lp(df: pd.DataFrame, path: str = '') -> None:
     fig, ax1 = plt.subplots(figsize=(10, 5))
     color1, color2 = 'tab:blue', 'tab:orange'
     plt.style.use('seaborn-whitegrid')
@@ -233,3 +233,45 @@ def plot_df(df: pd.DataFrame, path: str = '') -> None:
 
     # Show the plot
     plt.show()
+
+
+def get_grb_crossover_df_ot(log_dir: str) -> pd.DataFrame:
+    # Get list of all log files
+    log_files = glob.glob(os.path.join(log_dir, "*.log"))
+
+    # Initialize an empty dict to store data
+    data = {}
+
+    re_barrier = re.compile(r"Barrier solved model in (\d+) iterations and (\d+\.\d+) seconds")
+    re_crossover = re.compile(r"Solved in (\d+) iterations and (\d+\.\d+) seconds")
+
+    for log_file in log_files:
+
+        # Extract information from file name
+        file_name = os.path.basename(log_file)
+        base_name, _ = os.path.splitext(file_name)
+        parts = base_name.rsplit("_")  # split the base name into parts from the end
+
+        precision = parts[-1]
+        name = parts[1:-2]
+        data[name] = {}
+
+        with open(log_file, 'r') as f:
+            for line in f:
+                match = re_barrier.search(line)
+                if match:
+                    runtime_barrier = float(match.group(2))
+                match = re_crossover.search(line)
+                if match:
+                    runtime_crossover = float(match.group(2))
+                    iter_counts = int(match.group(1))
+
+            data[name] = {'barrier': runtime_barrier, 'crossover': runtime_crossover, 'iter': iter_counts}
+
+    df = pd.DataFrame(data)
+    df = df.transpose()
+    df = df[["Barrier", "CrossoverTime", "CrossoverIter"]]
+
+    return df
+
+

@@ -126,7 +126,7 @@ class MCFManagerStd():
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         """ Solve the sub problem. """
-        method = "network_simplex" if solver == "CPL" or "MSK" else "default"
+        method = "network_simplex" if solver == "CPL" else "primal_simplex"
         return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['non_fix']], self.basis.cbasis), settings=solver_settings)
 
     def fix_variables(self, ind_fix_to_low: np.ndarray, ind_fix_to_up: np.ndarray) -> None:
@@ -142,6 +142,13 @@ class MCFManagerStd():
         self.var_info['fix'] = np.setdiff1d(self.var_info['fix'], ind_free_new)
         self.var_info['fix_low'] = np.setdiff1d(self.var_info['fix_low'], ind_free_new)
         self.var_info['fix_up'] = np.setdiff1d(self.var_info['fix_up'], ind_free_new)
+
+    def recover_x_from_sub_x(self, x_sub: np.ndarray) -> np.ndarray:
+        """ Recover the solution of the current LP from the solution of the sub problem. """
+        x = np.zeros(self.mcf.c.size)
+        x[self.var_info['non_fix']] = x_sub
+        x[self.var_info['fix_up']] = self.mcf.u[self.var_info['fix_up']]
+        return x
 
     def recover_basis_from_sub_basis(self, basis_sub: Basis) -> Basis:
         """ Recover the basis of the current LP from a basis of the sub problem. """
