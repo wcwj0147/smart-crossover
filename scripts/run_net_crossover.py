@@ -11,13 +11,14 @@ from smart_crossover.filehandling import write_results_to_pickle
 from smart_crossover.formats import OptTransport, MinCostFlow
 from smart_crossover.network_methods.algorithms import network_crossover
 from smart_crossover.solver_caller.caller import SolverSettings
+from smart_crossover.solver_caller.gurobi import GrbCaller
 from smart_crossover.solver_caller.solving import solve_mcf, solve_ot
 
 
 def load_opt_transport_instances(folder: str = get_project_root() / "data/ot_mnist") -> List[OptTransport]:
     instances = []
     file_names = sorted(os.listdir(folder))
-    for file_name in file_names[53:54]:
+    for file_name in file_names:
         if file_name.endswith('.ot'):
             file_path = os.path.join(folder, file_name)
             with open(file_path, 'rb') as f:
@@ -26,14 +27,26 @@ def load_opt_transport_instances(folder: str = get_project_root() / "data/ot_mni
     return instances
 
 
+
 def load_min_cost_flow_instances(folder: str = get_project_root() / "data/mcf") -> List[MinCostFlow]:
     instances = []
     file_names = sorted(os.listdir(folder))
-    for file_name in file_names[0:2]:
+    for file_name in file_names:
+
+        # Todo: remove this
+        if file_name != 'wide15.mps':
+            continue
+
+        file_path = os.path.join(folder, file_name)
         if file_name.endswith('.mcf'):
-            file_path = os.path.join(folder, file_name)
             with open(file_path, 'rb') as f:
                 mcf = pickle.load(f)
+            instances.append(mcf)
+        if file_name.endswith('.mps'):
+            grb_caller = GrbCaller()
+            grb_caller.read_model_from_file(file_path)
+            mcf = grb_caller.return_mcf()
+            mcf.name = file_name.split('.')[0]
             instances.append(mcf)
     return instances
 
@@ -52,10 +65,11 @@ def main(solver: str, problem: str, test_object: str, barrierTol: float):
                                                          log_file=str(get_project_root() / "results" / "logs" / "mcf" /f"{mcf.name}_{solver}_{-round(np.log10(barrierTol))}.log")))
 
             if test_object == 'crossover':
-                barrier_output = solve_mcf(mcf, method='barrier', solver=solver, settings=SolverSettings(barrierTol=barrierTol, crossover='off'))
-                cnet_output = network_crossover(x=barrier_output.x_bar, mcf=mcf, method='cnet_mcf', solver=solver,
-                                                solver_settings=SolverSettings(presolve='on'))
+                barrier_output = solve_mcf(mcf, method='barrier', solver=solver, settings=SolverSettings(barrierTol=barrierTol, crossover='off', presolve='off'))
+                cnet_output = network_crossover(x=barrier_output.x, mcf=mcf, method='cnet_mcf', solver=solver,
+                                                solver_settings=SolverSettings(presolve='off'))
                 results[mcf.name] = {'cnet': (cnet_output.runtime, cnet_output.iter_count)}
+                print(barrier_output.obj_val, cnet_output.obj_val)
 
     if problem == 'ot':
         ot_instances = load_opt_transport_instances()
