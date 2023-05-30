@@ -42,8 +42,10 @@ def network_crossover(
 
     if method == "tnet" or method == "cnet_ot":
         manager = OTManager(ot)
+        num_vars_in_first_subproblem = int(10 * manager.m)
     elif method == "cnet_mcf":
         manager = MCFManagerStd(mcf)
+        num_vars_in_first_subproblem = int(1.2 * manager.m)
     else:
         raise ValueError("Invalid method specified. Choose from 'tnet', 'cnet_ot', or 'cnet_mcf'.")
 
@@ -51,16 +53,18 @@ def network_crossover(
     queue, flow_indicators = manager.get_sorted_flows(x)
 
     if method == "tnet":
+        manager.get_mcf()
         tree_basis, push_iter = tree_basis_identify(manager, flow_indicators)
         manager.set_basis(tree_basis)
         manager.add_free_variables(tree_basis.vbasis == 0)
     else:  # method in ["cnet_ot", "cnet_mcf"]
         if method == "cnet_ot":
             manager.extend_by_bigM(manager.m * np.max(ot.M))
+            manager.get_mcf()
         elif method == "cnet_mcf":
             manager.rescale_cost(np.max(np.abs(mcf.c)))
             manager.fix_variables(ind_fix_to_up=np.where(x >= mcf.u / 2)[0], ind_fix_to_low=np.where(x < mcf.u / 2)[0])
-            manager.extend_by_bigM(manager.m * np.max(mcf.u))
+            manager.extend_by_bigM(manager.m * np.max(mcf.c))
         manager.update_subproblem()
         manager.set_initial_basis()
 
@@ -82,7 +86,7 @@ def column_generation(net_manager: NetworkManager,
     timer = Timer()
     timer.start_timer()
     left_pointer = 0
-    num_vars_in_next_subproblem = int(1.5 * net_manager.m)
+    num_vars_in_next_subproblem = num_vars_in_first_subproblem
     is_not_optimal = True
     x = None
     obj_val = None

@@ -76,7 +76,6 @@ class MCFManagerStd():
         u_1 = np.concatenate([self.mcf.u, np.Inf * np.ones(self.n)])
         A_1 = sp.hstack((self.mcf.A, sp.diags(b_sign)))
         A_1 = sp.vstack((A_1, sp.csr_matrix(np.concatenate([np.zeros(self.n), -b_sign]))))
-        A_1 = A_1.tocsr()
         b_1 = np.concatenate([self.mcf.b, np.array([0])])
         self.mcf = MinCostFlow(A_1, b_1, c_1, u_1)
         self.artificial_vars = np.array(range(self.n, self.n + self.m), dtype=int)
@@ -126,7 +125,7 @@ class MCFManagerStd():
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         """ Solve the sub problem. """
-        method = "network_simplex" if solver == "CPL" else "primal_simplex"
+        method = "network_simplex" if solver == "CPL" else "dual_simplex"
         return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['non_fix']], self.basis.cbasis), settings=solver_settings)
 
     def fix_variables(self, ind_fix_to_low: np.ndarray, ind_fix_to_up: np.ndarray) -> None:
@@ -210,8 +209,10 @@ class OTManager:
         self.m = ot.s.size + ot.d.size
         self.n = ot.s.size * ot.d.size
         self.mask_sub_ot = np.zeros(self.n, dtype=bool)
-        self.mcf = ot.to_MCF()
         self.artificial_vars = np.array([])
+
+    def get_mcf(self) -> None:
+        self.mcf = self.ot.to_MCF()
 
     def get_X(self, x: np.ndarray) -> np.ndarray:
         """ Get X from the vector x, such that X[i][j] = the flow from source i to destination j. """
@@ -238,7 +239,6 @@ class OTManager:
         # self.artificial_vars all the variables in the self.mask_sub_ot such that it is 1:
         self.artificial_vars = np.where(self.mask_sub_ot.ravel())[0]
         self.ot = OptTransport(s_appended, d_appended, M_appended)
-        self.mcf = self.ot.to_MCF()
 
     def add_free_variables(self, ind_free: np.ndarray) -> None:
         """ Add free variables in the sub OT problem. """
@@ -265,14 +265,13 @@ class OTManager:
         return Basis(vbasis, basis_sub.cbasis)
 
     def get_sub_problem(self) -> MinCostFlow:
-        mcf = self.ot.to_MCF()
-        mcf.A = mcf.A.tocsc()[:, self.mask_sub_ot.ravel()]
-        mcf.c = self.ot.M.flatten()[self.mask_sub_ot.ravel()]
-        mcf.u = mcf.u[self.mask_sub_ot.ravel()]
-        return mcf
+        A = self.mcf.A.tocsc()[:, self.mask_sub_ot.ravel()]
+        c = self.ot.M.flatten()[self.mask_sub_ot.ravel()]
+        u = self.mcf.u[self.mask_sub_ot.ravel()]
+        return MinCostFlow(A=A, b=self.mcf.b, c=c, u=u)
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
-        method = "network_simplex" if solver == "CPL" else "primal_simplex"
+        method = "network_simplex" if solver == "CPL" else "dual_simplex"
         return solve_mcf(self.get_sub_problem(), solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis), settings=solver_settings)
 
     def recover_obj_val(self, obj_val):
