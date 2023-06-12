@@ -198,8 +198,7 @@ class MskCaller(SolverCaller):
 
     def return_status(self) -> str:
         if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
-            if self.task.getsolsta(mosek.soltype.itr) == mosek.solsta.optimal:
-                return "OPTIMAL"
+            return "OPTIMAL"
         if self.task.getsolsta(mosek.soltype.bas) == mosek.solsta.optimal:
             return "OPTIMAL"
         return "OTHER"

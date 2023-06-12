@@ -8,7 +8,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from smart_crossover.formats import MinCostFlow, StandardLP, GeneralLP
-from smart_crossover.output import Basis
+from smart_crossover.output import Basis, Output
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
 
 
@@ -158,7 +158,9 @@ class GrbCaller(SolverCaller):
         self._set_log()
         self._set_tol()
         self._set_time_limit()
+        self._set_iter_limit()
         self._set_presolve()
+        self._set_pricing()
         self.model.optimize()
 
     def _set_presolve(self) -> None:
@@ -177,6 +179,15 @@ class GrbCaller(SolverCaller):
 
     def _set_time_limit(self) -> None:
         self.model.setParam("TimeLimit", self.settings.timeLimit)
+
+    def _set_iter_limit(self) -> None:
+        self.model.setParam("BarIterLimit", self.settings.iterLimit)
+
+    def _set_pricing(self) -> None:
+        if self.settings.simplexPricing == 'SE':
+            self.model.setParam("SimplexPricing", 1)
+        if self.settings.simplexPricing == 'PP':
+            self.model.setParam("SimplexPricing", 0)
 
     def get_model_report(self) -> str:
         report_str = f"\n {self.model.ModelName}: \n"

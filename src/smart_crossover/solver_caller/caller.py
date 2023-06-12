@@ -20,9 +20,11 @@ class SolverSettings:
     crossover: str = "on"
     barrierTol: float = 1e-8
     optimalityTol: float = 1e-6
-    timeLimit: int = 3600
+    timeLimit: int = 3600*2
     log_file: str = ""
     log_console: int = 1
+    iterLimit: int = 1000
+    simplexPricing: str = ''
 
 
 class SolverCaller(ABC):
@@ -123,7 +125,8 @@ class SolverCaller(ABC):
                       runtime=self.return_runtime(),
                       iter_count=self.return_iter_count(),
                       bar_iter_count=self.return_bar_iter_count(),
-                      basis=self.return_basis()
+                      basis=self.return_basis(),
+                      status=self.return_status()
                       )
 
     def run_default(self) -> None:
@@ -166,4 +169,7 @@ class SolverCaller(ABC):
         ...
 
     def _set_tol(self) -> None:
+        ...
+
+    def _set_pricing(self) -> None:
         ...

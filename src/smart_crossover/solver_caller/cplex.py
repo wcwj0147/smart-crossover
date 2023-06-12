@@ -1,3 +1,5 @@
+import re
+import uuid
 import datetime
 from typing import Optional, Tuple
 
@@ -5,6 +7,7 @@ import cplex
 import numpy as np
 import scipy.sparse as sp
 
+from smart_crossover import get_project_root
 from smart_crossover.formats import MinCostFlow, StandardLP, GeneralLP
 from smart_crossover.output import Basis
 from smart_crossover.solver_caller.caller import SolverCaller, SolverSettings
@@ -16,6 +19,7 @@ class CplCaller(SolverCaller):
         self.settings = solver_settings
         self.model = cplex.Cplex()
         self.runtime = 0
+        self.iterations = None
 
     def read_model_from_file(self, path: str) -> None:
         self.model.read(path)
@@ -117,14 +121,14 @@ class CplCaller(SolverCaller):
         return datetime.timedelta(seconds=self.runtime)
 
     def return_iter_count(self) -> int:
-        return round(self.model.solution.progress.get_num_iterations())
+        return round(self.iterations)
 
     def return_bar_iter_count(self) -> int:
         return self.model.solution.progress.get_num_barrier_iterations()
 
     def return_reduced_cost(self) -> np.ndarray:
         return np.array(self.model.solution.get_reduced_costs())
-    
+
     def return_status(self) -> str:
         if self.model.solution.get_status_string() == 'optimal':
             return 'OPTIMAL'
@@ -181,12 +185,11 @@ class CplCaller(SolverCaller):
         """Run the solver with the current settings."""
         self._set_tol()
         self._set_presolve()
+        self._set_pricing()
         self._set_log()
         self._set_time_limit()
-        start = self.model.get_time()
         self.model.solve()
-        end = self.model.get_time()
-        self.runtime = end - start
+        self.runtime, self.iterations = get_runtime_and_iterations_from_log(self.settings.log_file)
 
     def _set_tol(self) -> None:
         self.model.parameters.barrier.convergetol.set(self.settings.barrierTol)
@@ -198,13 +201,40 @@ class CplCaller(SolverCaller):
         else:
             self.model.parameters.preprocessing.presolve.set(1)
 
+    def _set_pricing(self) -> None:
+        if self.settings.simplexPricing == 'PP':
+            self.model.parameters.network.pricing.set(1)
+
     def _set_log(self) -> None:
         self.model.parameters.simplex.display.set(1)
         self.model.parameters.barrier.display.set(1)
         if self.settings.log_file != '':
             log_file = open(self.settings.log_file, 'a')  # Open the file in append mode
-            self.model.set_results_stream(log_file)
-            self.model.set_log_stream(log_file)
+        else:
+            self.settings.log_file = get_project_root() / 'results/logs/cplex/cplex_log.log'
+            # open the file in rewrite mode
+            log_file = open(self.settings.log_file, 'w+')
+        self.model.set_results_stream(log_file)
+        self.model.set_log_stream(log_file)
 
     def _set_time_limit(self) -> None:
         self.model.parameters.setTimeLimit = self.settings.timeLimit
+
+
+def get_runtime_and_iterations_from_log(log_file_path: str):
+    # Regular expression to match lines like
+    # "Network time = 0.00 sec. (0.47 ticks)  Iterations = 838 (395)"
+    pattern = re.compile(r"Network time = (\d+\.\d+) sec.*Iterations = (\d+)")
+
+    runtime = None
+    iterations = None
+
+    with open(log_file_path, 'r') as log_file:
+        for line in log_file:
+            match = pattern.search(line)
+            if match:
+                runtime = float(match.group(1))
+                iterations = int(match.group(2))
+
+    return runtime, iterations
+
