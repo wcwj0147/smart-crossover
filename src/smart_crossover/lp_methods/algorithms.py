@@ -13,7 +13,6 @@ from smart_crossover.solver_caller.solving import solve_lp
 
 
 def run_perturb_algorithm(lp: GeneralLP,
-                          perturb_method: str,
                           solver: str = "GRB",
                           barrierTol: float = 1e-8,
                           optimalityTol: float = 1e-6,
@@ -22,7 +21,6 @@ def run_perturb_algorithm(lp: GeneralLP,
 
     Args:
         lp: the original LP problem in GeneralLP format.
-        perturb_method: the perturbation method (choose from 'random', 'primal', 'dual').
         solver: the solver used to solve the LP.
         barrierTol: the barrier tolerance.
         optimalityTol: the optimality tolerance.
@@ -36,11 +34,19 @@ def run_perturb_algorithm(lp: GeneralLP,
                               method='barrier',
                               settings=SolverSettings(barrierTol=barrierTol, presolve='on', crossover='off', log_file=log_file))
 
-    perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, barrier_output.y)
+    gamma = 1e-3
+    while True:
 
-    perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
-                                      method='barrier',
-                                      settings=SolverSettings(presolve="on", log_file=log_file))
+        perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, barrier_output.y, gamma)
+
+        perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
+                                          method='barrier',
+                                          settings=SolverSettings(presolve="on", log_file=log_file))
+
+        if perturb_barrier_output.status != 'OPTIMAL':
+            gamma = gamma * 1e-5
+        else:
+            break
 
     check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, lp.c, barrier_output.obj_val)
 
@@ -61,7 +67,8 @@ def run_perturb_algorithm(lp: GeneralLP,
 def get_perturb_problem(lp: GeneralLP,
                         perturb_method: str,
                         x: Optional[np.ndarray],
-                        y: Optional[np.ndarray]) -> LPManager:
+                        y: Optional[np.ndarray],
+                        gamma: Optional[float]) -> LPManager:
     """
     Find an approximated optimal face using the given interior-point solution. And get the subproblem
     restricted on that optimal face. Use the perturbed objective c_pt.
@@ -71,6 +78,7 @@ def get_perturb_problem(lp: GeneralLP,
         perturb_method: the perturbation method (choose from 'random', 'primal', 'dual').
         x: the primal interior-point solution.
         y: the dual interior-point solution.
+        gamma: the parameter to approximate optimal face: x < gamma * s
 
     Returns:
         A LP manager of a sub-problem restricted on the approximated optimal face.
@@ -83,25 +91,18 @@ def get_perturb_problem(lp: GeneralLP,
     def get_primal_slack(A: sp.csr_matrix, b: np.ndarray, x: np.ndarray) -> np.ndarray:
         return b - A @ x
 
-    BETA = 1e-3
-
     s_d = get_dual_slack(lp.A, lp.c, y)
     s_p = get_primal_slack(lp.A, lp.b, x)
 
     subLP_manager = LPManager(lp.copy())
-    subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < BETA * s_d)[0],
-                                ind_fix_to_up=np.where(lp.u - x < BETA * -s_d)[0])
-    subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < BETA * -y)[0])
+    subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < gamma * s_d)[0],
+                                ind_fix_to_up=np.where(lp.u - x < gamma * -s_d)[0])
+    subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < gamma * -y)[0])
     logging.critical("  The number of fixed variables is %d." % subLP_manager.get_num_fixed_variables())
     logging.critical("  The number of fixed constraints is %d." % subLP_manager.get_num_fixed_constraints())
     subLP_manager.update_subproblem()
 
-    if perturb_method == 'primal':
-        subLP_manager.update_c(perturb_c(subLP_manager.lp_sub, subLP_manager.get_subx(x)))
-    elif perturb_method == 'dual':
-        subLP_manager.update_b(perturb_b(lp, y))
-    else:
-        raise ValueError("The perturbation method is not supported.")
+    subLP_manager.update_c(perturb_c(subLP_manager.lp_sub, subLP_manager.get_subx(x)))
 
     return subLP_manager
 
@@ -166,11 +167,6 @@ def get_x_perturb_val(lp: GeneralLP,
     x_min = np.minimum(x - lp.l, lp.u - x)
     x_min[lp.get_free_variables()] = 0  # free variables are not perturbed
     return x_min
-
-
-def perturb_b(lp_ori: GeneralLP,
-              y: np.ndarray) -> np.ndarray:
-    pass
 
 
 def check_perturb_output_precision(sublp_manager: LPManager,
