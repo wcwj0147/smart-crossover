@@ -15,8 +15,10 @@ if __name__ == "__main__":
             author_email='wcwj1999@outlook.com',
             packages=find_packages(where='src'),
             package_dir={'': 'src'},
+            license='MIT',
             install_requires=[],
             classifiers=[
+                'License :: OSI Approved :: MIT License',
                 'Programming Language :: Python :: 3.7',
             ],
         )
