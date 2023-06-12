@@ -11,7 +11,7 @@ if __name__ == "__main__":
             description='Smart Crossover Algorithms for LP',
             long_description=readme,
             url='https://github.com/wcwj0147/smart-crossover',
-            author='Your Name',  # replace with your name
+            author='Jian',  # replace with your name
             author_email='wcwj1999@outlook.com',
             packages=find_packages(where='src'),
             package_dir={'': 'src'},
