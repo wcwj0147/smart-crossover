@@ -42,10 +42,8 @@ def network_crossover(
 
     if method == "tnet" or method == "cnet_ot":
         manager = OTManager(ot)
-        num_vars_in_first_subproblem = int(10 * manager.m)
     elif method == "cnet_mcf":
         manager = MCFManagerStd(mcf)
-        num_vars_in_first_subproblem = int(1.2 * manager.m)
     else:
         raise ValueError("Invalid method specified. Choose from 'tnet', 'cnet_ot', or 'cnet_mcf'.")
 
@@ -86,7 +84,7 @@ def column_generation(net_manager: NetworkManager,
     timer = Timer()
     timer.start_timer()
     left_pointer = 0
-    num_vars_in_next_subproblem = num_vars_in_first_subproblem
+    num_vars_in_next_subproblem = int(10 * net_manager.m) if net_manager.n / net_manager.m > 1000 else int(1.2 * net_manager.m)
     is_not_optimal = True
     x = None
     obj_val = None
