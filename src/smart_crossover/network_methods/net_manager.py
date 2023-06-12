@@ -125,7 +125,7 @@ class MCFManagerStd():
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
         """ Solve the sub problem. """
-        method = "network_simplex" if solver == "CPL" else "dual_simplex"
+        method = "network_simplex" if solver == "CPL" else "default"
         return solve_mcf(self.mcf_sub, solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.var_info['non_fix']], self.basis.cbasis), settings=solver_settings)
 
     def fix_variables(self, ind_fix_to_low: np.ndarray, ind_fix_to_up: np.ndarray) -> None:
@@ -271,7 +271,7 @@ class OTManager:
         return MinCostFlow(A=A, b=self.mcf.b, c=c, u=u)
 
     def solve_subproblem(self, solver: str, solver_settings: SolverSettings) -> Output:
-        method = "network_simplex" if solver == "CPL" else "dual_simplex"
+        method = "network_simplex" if solver == "CPL" else "default"
         return solve_mcf(self.get_sub_problem(), solver=solver, method=method, warm_start_basis=Basis(self.basis.vbasis[self.mask_sub_ot.ravel()], self.basis.cbasis), settings=solver_settings)
 
     def recover_obj_val(self, obj_val):
