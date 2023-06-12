@@ -8,6 +8,8 @@ import scipy.sparse.linalg as splinalg
 from smart_crossover.formats import GeneralLP
 from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Output
+from smart_crossover.parameters import OPTIMAL_FACE_ESTIMATOR, OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO, PERTURB_THRESHOLD, \
+    CONSTANT_SCALE_FACTOR
 from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_lp
 
@@ -34,17 +36,17 @@ def run_perturb_algorithm(lp: GeneralLP,
                               method='barrier',
                               settings=SolverSettings(barrierTol=barrierTol, presolve='on', crossover='off', log_file=log_file))
 
-    gamma = 1e-3
+    gamma = OPTIMAL_FACE_ESTIMATOR
     while True:
 
-        perturbLP_manager = get_perturb_problem(lp, perturb_method, barrier_output.x, barrier_output.y, gamma)
+        perturbLP_manager = get_perturb_problem(lp, barrier_output.x, barrier_output.y, gamma)
 
         perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
                                           method='barrier',
                                           settings=SolverSettings(presolve="on", log_file=log_file))
 
         if perturb_barrier_output.status != 'OPTIMAL':
-            gamma = gamma * 1e-5
+            gamma = gamma * OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO
         else:
             break
 
@@ -65,7 +67,6 @@ def run_perturb_algorithm(lp: GeneralLP,
 
 
 def get_perturb_problem(lp: GeneralLP,
-                        perturb_method: str,
                         x: Optional[np.ndarray],
                         y: Optional[np.ndarray],
                         gamma: Optional[float]) -> LPManager:
@@ -75,7 +76,6 @@ def get_perturb_problem(lp: GeneralLP,
 
     Args:
         lp: the original LP problem in StandardLP format.
-        perturb_method: the perturbation method (choose from 'random', 'primal', 'dual').
         x: the primal interior-point solution.
         y: the dual interior-point solution.
         gamma: the parameter to approximate optimal face: x < gamma * s
@@ -120,24 +120,20 @@ def perturb_c(lp_ori: GeneralLP,
         Perturbed cost vector.
 
     """
-    PERTURB_THRESHOLD = 1e-6
     n = len(x)
-
-    perturbation_vector = np.zeros_like(x, dtype=np.float64)
 
     x_real = get_x_perturb_val(lp_ori, x)
     # Compute the perturbation vector = scale_factor / x_real * np.random / ||np.random||.
     np.random.seed(42)
-    p = np.random.uniform(0.9, 1, np.sum(x_real > PERTURB_THRESHOLD))
+    p = np.random.uniform(0.9, 1, x_real.size)
     p = p / np.linalg.norm(p)
     projector = get_projector_c(lp_ori, x_real)
     scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp_ori.sense == '<'))
-    p = p / x_real[x_real > PERTURB_THRESHOLD] * scale_factor
-    perturbation_vector[x_real > PERTURB_THRESHOLD] = p
+    p = p / x_real * scale_factor
 
     logging.critical("  Projector: %(pj)s, \n  Scale factor: %(sf)s", {'pj': np.linalg.norm(projector), 'sf': scale_factor})
 
-    c_pt = lp_ori.c + perturbation_vector
+    c_pt = lp_ori.c + p
     return c_pt
 
 
@@ -157,7 +153,6 @@ def get_projector_c(lp_ori: GeneralLP,
 def get_scale_factor(projector: np.ndarray, n: int) -> float:
     """Get the scale factor for perturbation."""
     # scale_factor = ||projector|| / (CONSTANT_SCALE_FACTOR * n)
-    CONSTANT_SCALE_FACTOR = 1e-2
     return np.linalg.norm(projector) / (CONSTANT_SCALE_FACTOR * n)
 
 
@@ -166,6 +161,7 @@ def get_x_perturb_val(lp: GeneralLP,
     """Get the x values used for perturbation estimation."""
     x_min = np.minimum(x - lp.l, lp.u - x)
     x_min[lp.get_free_variables()] = 0  # free variables are not perturbed
+    x_min[x_min < PERTURB_THRESHOLD] = PERTURB_THRESHOLD
     return x_min
 
 
@@ -174,7 +170,6 @@ def check_perturb_output_precision(sublp_manager: LPManager,
                                    c_ori: np.ndarray,
                                    barrier_obj: float) -> bool:
     """Check if the perturbation is precise enough."""
-    PRIMAL_DUAL_GAP_THRESHOLD = 1e-6
 
     x = sublp_manager.get_orix(x_ptb)
     my_primal_obj = c_ori @ x
