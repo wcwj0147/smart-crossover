@@ -140,14 +140,14 @@ def perturb_c(lp_ori: GeneralLP,
 def get_projector_c(lp_ori: GeneralLP,
                     x: np.ndarray) -> np.ndarray:
     """Get the projector of c."""
-    def apply_projector(Y, c, tol=1e-8, max_iter=1000):
-        """ Apply the projection matrix (I - Y^T (Y Y^T)† Y) to a vector c using conjugate gradient method. """
-        Yc = Y @ c
-        z, _ = splinalg.cg(Y @ Y.T, Yc, tol=tol, maxiter=max_iter)
-        return c - Y.T @ z
+    def apply_projector(Y, v, tol=1e-8, max_iter=1000):
+        """ Apply the projection matrix (I - Y^T (Y Y^T)† Y) to a vector v using conjugate gradient method. """
+        Yv = Y @ v
+        z, _ = splinalg.cg(Y @ Y.T, Yv, tol=tol, maxiter=max_iter)
+        return v - Y.T @ z
 
-    # calculate the projector: [I - (A X)^T (A X X A^T)† (A X)] c
-    return apply_projector(lp_ori.A @ sp.diags(x), lp_ori.c)
+    # calculate the projector: [I - (A X)^T (A X X A^T)† (A X)] X c
+    return apply_projector(lp_ori.A @ sp.diags(x), sp.diags(x) @ lp_ori.c)
 
 
 def get_scale_factor(projector: np.ndarray, n: int) -> float:
