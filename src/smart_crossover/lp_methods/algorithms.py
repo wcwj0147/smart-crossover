@@ -9,7 +9,7 @@ from smart_crossover.formats import GeneralLP
 from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Output
 from smart_crossover.parameters import OPTIMAL_FACE_ESTIMATOR, OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO, PERTURB_THRESHOLD, \
-    CONSTANT_SCALE_FACTOR
+    CONSTANT_SCALE_FACTOR, PRIMAL_DUAL_GAP_THRESHOLD
 from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_lp
 
