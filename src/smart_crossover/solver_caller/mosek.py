@@ -197,10 +197,12 @@ class MskCaller(SolverCaller):
         return np.array(self.task.getreducedcosts(mosek.soltype.bas))
 
     def return_status(self) -> str:
-        if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never:
+        if self.task.getintparam(mosek.iparam.intpnt_basis) == mosek.basindtype.never or self.task.getsolsta(mosek.soltype.bas) == mosek.solsta.optimal:
             return "OPTIMAL"
-        if self.task.getsolsta(mosek.soltype.bas) == mosek.solsta.optimal:
-            return "OPTIMAL"
+        if self.task.getprosta(mosek.soltype.bas) == mosek.prosta.prim_infeas or self.task.getprosta(mosek.iparam.intpnt_basis) == mosek.prosta.prim_infeas:
+            return "INFEASIBLE"
+        if self.task.getprosta(mosek.soltype.bas) == mosek.prosta.dual_infeas or self.task.getprosta(mosek.iparam.intpnt_basis) == mosek.prosta.dual_infeas:
+            return "UNBOUNDED"
         return "OTHER"
 
     def run_default(self) -> None:

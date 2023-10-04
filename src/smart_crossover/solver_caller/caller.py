@@ -20,7 +20,7 @@ class SolverSettings:
     crossover: str = "on"
     barrierTol: float = 1e-8
     optimalityTol: float = 1e-6
-    timeLimit: int = 3600*2
+    timeLimit: int = 3600
     log_file: str = ""
     log_console: int = 1
     iterLimit: int = 1000
@@ -118,7 +118,9 @@ class SolverCaller(ABC):
 
     def return_output(self) -> Output:
         if self.return_status() != "OPTIMAL":
-            return Output()
+            return Output(
+                runtime=self.return_runtime(),
+                status=self.return_status())
         return Output(x=self.return_x(),
                       y=self.return_y(),
                       obj_val=self.return_obj_val(),

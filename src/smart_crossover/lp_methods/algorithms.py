@@ -45,7 +45,7 @@ def run_perturb_algorithm(lp: GeneralLP,
                                           method='barrier',
                                           settings=SolverSettings(presolve="on", log_file=log_file))
 
-        if perturb_barrier_output.status != 'OPTIMAL':
+        if perturb_barrier_output.status == 'INFEASIBLE' or perturb_barrier_output.status =='UNBOUNDED':
             gamma = gamma * OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO
         else:
             break
@@ -61,9 +61,7 @@ def run_perturb_algorithm(lp: GeneralLP,
 
     return Output(x=final_output.x,
                   y=final_output.y,
-                  obj_val=final_output.obj_val,
-                  runtime=barrier_output.runtime + perturb_barrier_output.runtime + final_output.runtime,
-                  iter_count=perturb_barrier_output.iter_count + final_output.iter_count)
+                  obj_val=final_output.obj_val)
 
 
 def get_perturb_problem(lp: GeneralLP,
@@ -127,7 +125,7 @@ def perturb_c(lp_ori: GeneralLP,
     np.random.seed(42)
     p = np.random.uniform(0.9, 1, x_real.size)
     p = p / np.linalg.norm(p)
-    projector = get_projector_c(lp_ori, x_real)
+    projector = get_projector_Xc(lp_ori, x_real)
     scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp_ori.sense == '<'))
     p = p / x_real * scale_factor
 
@@ -137,17 +135,19 @@ def perturb_c(lp_ori: GeneralLP,
     return c_pt
 
 
-def get_projector_c(lp_ori: GeneralLP,
-                    x: np.ndarray) -> np.ndarray:
+def get_projector_Xc(lp_ori: GeneralLP,
+                     x: np.ndarray) -> np.ndarray:
     """Get the projector of c."""
-    def apply_projector(Y, v, tol=1e-8, max_iter=1000):
-        """ Apply the projection matrix (I - Y^T (Y Y^T)† Y) to a vector v using conjugate gradient method. """
-        Yv = Y @ v
-        z, _ = splinalg.cg(Y @ Y.T, Yv, tol=tol, maxiter=max_iter)
-        return v - Y.T @ z
 
     # calculate the projector: [I - (A X)^T (A X X A^T)† (A X)] X c
     return apply_projector(lp_ori.A @ sp.diags(x), sp.diags(x) @ lp_ori.c)
+
+
+def apply_projector(Y, v, tol=1e-8, max_iter=1000):
+    """ Apply the projection matrix (I - Y^T (Y Y^T)† Y) to a vector v using conjugate gradient method. """
+    Yv = Y @ v
+    z, _ = splinalg.cg(Y @ Y.T, Yv, tol=tol, maxiter=max_iter)
+    return v - Y.T @ z
 
 
 def get_scale_factor(projector: np.ndarray, n: int) -> float:
@@ -160,8 +160,8 @@ def get_x_perturb_val(lp: GeneralLP,
                       x: np.ndarray) -> np.ndarray:
     """Get the x values used for perturbation estimation."""
     x_min = np.minimum(x - lp.l, lp.u - x)
-    x_min[lp.get_free_variables()] = 0  # free variables are not perturbed
     x_min[x_min < PERTURB_THRESHOLD] = PERTURB_THRESHOLD
+    x_min[lp.get_free_variables()] = 0  # free variables are not perturbed
     return x_min
 
 
