@@ -9,7 +9,7 @@ from smart_crossover.formats import GeneralLP
 from smart_crossover.lp_methods.lp_manager import LPManager
 from smart_crossover.output import Output
 from smart_crossover.parameters import OPTIMAL_FACE_ESTIMATOR, OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO, PERTURB_THRESHOLD, \
-    CONSTANT_SCALE_FACTOR, PRIMAL_DUAL_GAP_THRESHOLD
+    CONSTANT_SCALE_FACTOR, PRIMAL_DUAL_GAP_THRESHOLD, PROJECTOR_THRESHOLD, PERTURB_UPPER_BOUND
 from smart_crossover.solver_caller.caller import SolverSettings
 from smart_crossover.solver_caller.solving import solve_lp
 
@@ -121,15 +121,21 @@ def perturb_c(lp_ori: GeneralLP,
     n = len(x)
 
     x_real = get_x_perturb_val(lp_ori, x)
-    # Compute the perturbation vector = scale_factor / x_real * np.random / ||np.random||.
+
+    # Compute the standard perturbation vector = scale_factor / x_real * np.random / ||np.random||.
     np.random.seed(42)
     p = np.random.uniform(0.9, 1, x_real.size)
     p = p / np.linalg.norm(p)
     projector = get_projector_Xc(lp_ori, x_real)
     scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp_ori.sense == '<'))
-    p = p / x_real * scale_factor
 
     logging.critical("  Projector: %(pj)s, \n  Scale factor: %(sf)s", {'pj': np.linalg.norm(projector), 'sf': scale_factor})
+
+    # If both projectors are small, then we don't use the scale factor computed, but a naive change of cost vector.
+    if np.linalg.norm(projector) * np.linalg.norm(apply_projector(lp_ori.A, lp_ori.c)) < PROJECTOR_THRESHOLD:
+        p = p * (np.max(np.abs(lp_ori.c)) + 1e-3) / x_real * np.sign(lp_ori.c)
+    else:
+        p = np.minimum(p / x_real * scale_factor / CONSTANT_SCALE_FACTOR, PERTURB_UPPER_BOUND)
 
     c_pt = lp_ori.c + p
     return c_pt
@@ -152,16 +158,16 @@ def apply_projector(Y, v, tol=1e-8, max_iter=1000):
 
 def get_scale_factor(projector: np.ndarray, n: int) -> float:
     """Get the scale factor for perturbation."""
-    # scale_factor = ||projector|| / (CONSTANT_SCALE_FACTOR * n)
-    return np.linalg.norm(projector) / (CONSTANT_SCALE_FACTOR * n)
+    # scale_factor = ||projector|| / n
+    return np.linalg.norm(projector) / n
 
 
 def get_x_perturb_val(lp: GeneralLP,
                       x: np.ndarray) -> np.ndarray:
     """Get the x values used for perturbation estimation."""
     x_min = np.minimum(x - lp.l, lp.u - x)
-    x_min[x_min < PERTURB_THRESHOLD] = PERTURB_THRESHOLD
     x_min[lp.get_free_variables()] = 0  # free variables are not perturbed
+    x_min[x_min < PERTURB_THRESHOLD] = PERTURB_THRESHOLD
     return x_min
 
 
