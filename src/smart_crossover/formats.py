@@ -26,25 +26,38 @@ class GeneralLP:
     def __post_init__(self) -> None:
         assert np.all(np.logical_or(self.sense == '=', self.sense == '<'))
 
-    def get_free_variables(self) -> np.ndarray:
+    def get_free_ind(self) -> np.ndarray:
         return np.where(np.logical_and(self.l == -np.inf, self.u == np.inf))[0]
+
+    def get_nonfree_ind(self) -> np.ndarray:
+        return np.setdiff1d(np.arange(self.get_standard_c().size), self.get_free_ind())
+
+    def get_free_var_matrix(self) -> sp.csr_matrix:
+        return self.A[:, self.get_free_ind()]
+
+    def get_nonfree_var_matrix(self) -> sp.csr_matrix:
+        return self.get_standard_A().tocsr()[:, self.get_nonfree_ind()]
 
     def get_standard_A(self) -> sp.csr_matrix:
         """ Added slack variables to the original A matrix, such that the LP can be transfered in the form A_new x = b. """
         m, n = self.A.shape
         A_new = sp.hstack([self.A, sp.eye(m, format="csr")[:, np.where(self.sense == "<")[0]]])
-        return A_new
+        return A_new.tocsr()
 
     def get_standard_c(self) -> np.ndarray:
-        return self.get_standard_var_vector(self.c)
+        return np.hstack([self.c, np.zeros(np.sum(self.sense == "<"))])
 
-    def get_standard_var_vector(self, var_vector: np.ndarray) -> np.ndarray:
+    def get_standard_x(self, x: np.ndarray) -> np.ndarray:
         """ Added slack variables to the original variable vector, which may represent a cost vector or a solution vector."""
         assert np.all(np.logical_or(self.sense == '=', self.sense == '<'))
-        return np.hstack([var_vector, np.zeros(np.sum(self.sense == "<"))])
+        slack_ind = np.where(self.sense == "<")[0]
+        return np.hstack([x, self.b[slack_ind] - self.A[slack_ind, :] @ x])
 
-    def recover_standard_var_vector(self, var_vector_std: np.ndarray) -> np.ndarray:
-        return var_vector_std[:self.c.size]
+    def get_dual_slack(self, y: np.ndarray) -> np.ndarray:
+        return self.c - self.A.transpose() @ y
+
+    def get_primal_slack(self, x: np.ndarray) -> np.ndarray:
+        return self.b - self.A @ x
 
     def copy(self) -> GeneralLP:
         return GeneralLP(self.A.copy(), self.b.copy(), self.c.copy(), self.l.copy(), self.u.copy(), self.sense.copy(), self.name)

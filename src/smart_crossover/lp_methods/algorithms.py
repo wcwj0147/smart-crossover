@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as splinalg
+import gurobipy as gp
 
 from smart_crossover.formats import GeneralLP
 from smart_crossover.lp_methods.lp_manager import LPManager
@@ -36,17 +37,22 @@ def run_perturb_algorithm(lp: GeneralLP,
                               method='barrier',
                               settings=SolverSettings(barrierTol=barrierTol, presolve='on', crossover='off', log_file=log_file))
 
-    gamma = OPTIMAL_FACE_ESTIMATOR
+    is_feas_problem = check_feasibility_problem(lp)
+
+    gamma, gamma_dual = OPTIMAL_FACE_ESTIMATOR, OPTIMAL_FACE_ESTIMATOR
     while True:
 
-        perturbLP_manager = get_perturb_problem(lp, barrier_output.x, barrier_output.y, gamma)
+        perturbLP_manager = get_perturb_problem(lp, barrier_output.x, barrier_output.y, gamma, gamma_dual, is_feas=is_feas_problem)
 
         perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
                                           method='barrier',
-                                          settings=SolverSettings(presolve="on", log_file=log_file))
+                                          settings=SolverSettings(presolve="on", log_file=log_file),
+                                          warm_start_solution=(perturbLP_manager.get_subx(barrier_output.x),
+                                                               barrier_output.y))
 
         if perturb_barrier_output.status == 'INFEASIBLE' or perturb_barrier_output.status =='UNBOUNDED':
             gamma = gamma * OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO
+            gamma_dual = gamma_dual * OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO ** 2
         else:
             break
 
@@ -65,9 +71,11 @@ def run_perturb_algorithm(lp: GeneralLP,
 
 
 def get_perturb_problem(lp: GeneralLP,
-                        x: Optional[np.ndarray],
-                        y: Optional[np.ndarray],
-                        gamma: Optional[float]) -> LPManager:
+                        x: np.ndarray,
+                        y: np.ndarray,
+                        gamma: float,
+                        gamma_dual: float,
+                        is_feas: bool) -> LPManager:
     """
     Find an approximated optimal face using the given interior-point solution. And get the subproblem
     restricted on that optimal face. Use the perturbed objective c_pt.
@@ -77,42 +85,37 @@ def get_perturb_problem(lp: GeneralLP,
         x: the primal interior-point solution.
         y: the dual interior-point solution.
         gamma: the parameter to approximate optimal face: x < gamma * s
+        c_new: the perturbed objective function.
 
     Returns:
         A LP manager of a sub-problem restricted on the approximated optimal face.
 
     """
-
-    def get_dual_slack(A: sp.csr_matrix, c: np.ndarray, y: np.ndarray) -> np.ndarray:
-        return c - A.transpose() @ y
-
-    def get_primal_slack(A: sp.csr_matrix, b: np.ndarray, x: np.ndarray) -> np.ndarray:
-        return b - A @ x
-
-    s_d = get_dual_slack(lp.A, lp.c, y)
-    s_p = get_primal_slack(lp.A, lp.b, x)
+    s_d = lp.get_dual_slack(y)
+    s_p = lp.get_primal_slack(x)
 
     subLP_manager = LPManager(lp.copy())
+    subLP_manager.lp.c = perturb_c(lp, x, is_feas)
     subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < gamma * s_d)[0],
                                 ind_fix_to_up=np.where(lp.u - x < gamma * -s_d)[0])
-    subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < gamma * -y)[0])
+    subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < gamma_dual * -y)[0])
     logging.critical("  The number of fixed variables is %d." % subLP_manager.get_num_fixed_variables())
     logging.critical("  The number of fixed constraints is %d." % subLP_manager.get_num_fixed_constraints())
     subLP_manager.update_subproblem()
 
-    subLP_manager.update_c(perturb_c(subLP_manager.lp_sub, subLP_manager.get_subx(x)))
-
     return subLP_manager
 
 
-def perturb_c(lp_ori: GeneralLP,
-              x: np.ndarray) -> np.ndarray:
+def perturb_c(lp: GeneralLP,
+              x: np.ndarray,
+              is_feas: bool) -> np.ndarray:
     """
     Perturb the input array `c` based on the interior-point solution `x`.
 
     Args:
-        lp_ori: The original LP.
+        lp: The subLP of the original one.
         x: An interior-point solution used to generate the perturbation.
+        is_feas: Whether the problem is a feasibility problem.
 
     Returns:
         Perturbed cost vector.
@@ -120,33 +123,57 @@ def perturb_c(lp_ori: GeneralLP,
     """
     n = len(x)
 
-    x_real = get_x_perturb_val(lp_ori, x)
+    x_real = get_x_perturb_val(lp, x)
+    x_real[x_real < PERTURB_THRESHOLD] = 1e-6
+    x_real[lp.get_free_ind()] = 1   # Just to avoid division by 0.
 
     # Compute the standard perturbation vector = scale_factor / x_real * np.random / ||np.random||.
     np.random.seed(42)
     p = np.random.uniform(0.9, 1, x_real.size)
     p = p / np.linalg.norm(p)
-    projector = get_projector_Xc(lp_ori, x_real)
-    scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp_ori.sense == '<'))
 
-    logging.critical("  Projector: %(pj)s, \n  Scale factor: %(sf)s", {'pj': np.linalg.norm(projector), 'sf': scale_factor})
+    if is_feas:
+        c_pt = lp.c + p
+        return c_pt
 
-    # If both projectors are small, then we don't use the scale factor computed, but a naive change of cost vector.
-    if np.linalg.norm(projector) * np.linalg.norm(apply_projector(lp_ori.A, lp_ori.c)) < PROJECTOR_THRESHOLD:
-        p = p * (np.max(np.abs(lp_ori.c)) + 1e-3) / x_real * np.sign(lp_ori.c)
-    else:
-        p = np.minimum(p / x_real * scale_factor / CONSTANT_SCALE_FACTOR, PERTURB_UPPER_BOUND)
+    projector = get_projector_Xc(lp, x_real)
+    scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp.sense == '<'))
+    logging.critical("  Projector: %(pj)s, \n  Scale factor: %(sf)s",
+                     {'pj': np.linalg.norm(projector), 'sf': scale_factor})
 
-    c_pt = lp_ori.c + p
+    p = np.minimum(p / x_real * scale_factor / CONSTANT_SCALE_FACTOR, PERTURB_UPPER_BOUND)
+    p[lp.get_free_ind()] = 0
+    c_pt = lp.c + p
     return c_pt
 
 
-def get_projector_Xc(lp_ori: GeneralLP,
+def get_projector_c(lp: GeneralLP) -> np.ndarray:
+    """Get the projector of c onto plane {Ax = 0}."""
+
+    # calculate the projector: [I - (A)^T (A A^T)† (A)] c
+    # note that to calculate projector, it is only meaningful when the LP is in standard form
+    return apply_projector_qp(lp.get_standard_A(), lp.get_standard_c())
+
+
+def get_projector_Xc(lp: GeneralLP,
                      x: np.ndarray) -> np.ndarray:
-    """Get the projector of c."""
+    """Get the projector of Xc."""
 
     # calculate the projector: [I - (A X)^T (A X X A^T)† (A X)] X c
-    return apply_projector(lp_ori.A @ sp.diags(x), sp.diags(x) @ lp_ori.c)
+    # note that to calculate projector, it is only meaningful when the LP is in standard form
+    xx = lp.get_standard_x(x)
+    xx_free, xx_nonfree = xx[lp.get_free_ind()], xx[lp.get_nonfree_ind()]
+    if lp.get_free_ind().size == 0:
+        return apply_projector(lp.get_standard_A() @ sp.diags(xx),
+                               sp.diags(xx) @ lp.get_standard_c())
+    else:
+        A_1 = lp.get_nonfree_var_matrix()
+        A_2 = lp.get_free_var_matrix()
+        trans, _ = splinalg.cg(A_2.T @ A_2, lp.get_standard_c()[lp.get_free_ind()], tol=1e-8, maxiter=1000)
+        c_nonfree = lp.get_standard_c()[lp.get_nonfree_ind()] - A_1.T @ A_2 @ trans
+        return apply_projector_qp(lp.get_nonfree_var_matrix() @ sp.diags(xx_nonfree),
+                                  sp.diags(xx_nonfree) @ c_nonfree,
+                                  lp.get_free_var_matrix())
 
 
 def apply_projector(Y, v, tol=1e-8, max_iter=1000):
@@ -165,9 +192,9 @@ def get_scale_factor(projector: np.ndarray, n: int) -> float:
 def get_x_perturb_val(lp: GeneralLP,
                       x: np.ndarray) -> np.ndarray:
     """Get the x values used for perturbation estimation."""
+    x_free = x[lp.get_free_ind()]
     x_min = np.minimum(x - lp.l, lp.u - x)
-    x_min[lp.get_free_variables()] = 0  # free variables are not perturbed
-    x_min[x_min < PERTURB_THRESHOLD] = PERTURB_THRESHOLD
+    x_min[lp.get_free_ind()] = x_free
     return x_min
 
 
@@ -184,3 +211,41 @@ def check_perturb_output_precision(sublp_manager: LPManager,
     logging.critical("  Primal-dual gap: %(gap).2e", {'gap': relative_primal_dual_gap})
     if relative_primal_dual_gap < PRIMAL_DUAL_GAP_THRESHOLD:
         return True
+
+
+def check_feasibility_problem(lp: GeneralLP) -> bool:
+    """ Check if the problem is a feasibility problem. """
+    proj_c = get_projector_c(lp)
+    if np.linalg.norm(proj_c) / np.linalg.norm(lp.c) < PROJECTOR_THRESHOLD:
+        return True
+    logging.critical(f"  ...{np.linalg.norm(proj_c) / np.linalg.norm(lp.c)}")
+    return False
+
+
+def apply_projector_qp(A: sp.csr_matrix, v: np.ndarray, A_f: sp.csr_matrix = None) -> np.ndarray:
+    """ Solve the projector of v onto plane {Ax = 0}
+
+    We formulate the following least square problem:
+    minimize sum_j(z_j^2)
+        s.t. z_j = x_j - v_j, j = 1, ..., n
+             A x = 0
+
+    """
+
+    ls = gp.Model()
+    m, n = A.shape
+    x = ls.addMVar(shape=n, lb=float('-inf'))
+    z = ls.addMVar(shape=n, lb=float('-inf'))
+    ls.setObjective(z @ z, gp.GRB.MINIMIZE)
+    ls.addConstr(z - x == - v)
+    if A_f is None:
+        ls.addConstr(A @ x == 0)
+    else:
+        print("FREE VARIABLE DETECTED")     # TODO: remove this line
+        f = ls.addMVar(shape=A_f.shape[1], lb=float('-inf'))
+        ls.addConstr(A @ x + A_f @ f == 0)
+
+    ls.setParam('BarQCPConvTol', 1e-1)
+    ls.optimize()
+
+    return x.X

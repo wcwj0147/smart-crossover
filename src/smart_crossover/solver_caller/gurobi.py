@@ -23,6 +23,8 @@ class GrbCaller(SolverCaller):
 
     def read_model_from_file(self, path: str) -> None:
         self.model = gurobipy.read(path)
+        self.model = self.model.relax()
+        self.model = self.model.presolve()
 
     def read_stdlp(self, stdlp: StandardLP) -> None:
         model = gurobipy.Model()

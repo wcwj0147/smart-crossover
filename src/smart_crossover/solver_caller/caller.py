@@ -7,7 +7,7 @@ from typing import Union, Tuple
 import gurobipy
 import numpy as np
 import scipy.sparse as sp
-import cplex
+# import cplex
 import mosek.fusion as mf
 
 from smart_crossover.formats import MinCostFlow, OptTransport, StandardLP, GeneralLP

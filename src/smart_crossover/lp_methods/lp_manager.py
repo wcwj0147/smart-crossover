@@ -92,6 +92,9 @@ class LPManager:
         self.lp.c[self.var_info['non_fix']] = c_sub_new
         self.lp_sub.c = c_sub_new
 
+    # def update_c(self, c: np.ndarray):
+    #     self.lp_sub.c = c[self.var_info['non_fix']]
+
     def update_b(self, b_new: np.ndarray) -> None:
         """ Update the right-hand side of the current LP. """
         self.lp.b = b_new
