@@ -7,7 +7,7 @@ from typing import Union, Tuple
 import gurobipy
 import numpy as np
 import scipy.sparse as sp
-# import cplex
+import cplex
 import mosek.fusion as mf
 
 from smart_crossover.formats import MinCostFlow, OptTransport, StandardLP, GeneralLP
@@ -123,6 +123,7 @@ class SolverCaller(ABC):
                 status=self.return_status())
         return Output(x=self.return_x(),
                       y=self.return_y(),
+                      x_bar=self.return_barx(),
                       obj_val=self.return_obj_val(),
                       runtime=self.return_runtime(),
                       iter_count=self.return_iter_count(),

@@ -17,7 +17,7 @@ def network_crossover(
         mcf: Optional[MinCostFlow] = None,
         method: str = "tnet",
         solver: str = "GRB",
-        solver_settings: SolverSettings = SolverSettings(),
+        solver_settings: SolverSettings = SolverSettings(log_console=0),
     ) -> Output:
     """
     Solve the network problem (MCF/OT) using TNET, CNET_OT, or CNET_MCF algorithms.
@@ -34,6 +34,8 @@ def network_crossover(
         the output of the selected algorithm.
 
     """
+
+    print(f"*** Running {method} algorithm. ***")
 
     # Set the timer.
     timer = Timer()
@@ -69,6 +71,8 @@ def network_crossover(
     timer.end_timer()
     cg_output = column_generation(manager, queue, solver, solver_settings)
 
+    print(f"*** Optimal solution found with {cg_output.iter_count + push_iter} simplex iterations in {timer.total_duration + cg_output.runtime} seconds. ***")
+
     return Output(x=cg_output.x, obj_val=cg_output.obj_val,
                   runtime=timer.total_duration + cg_output.runtime,
                   iter_count=cg_output.iter_count + push_iter,
@@ -89,6 +93,7 @@ def column_generation(net_manager: NetworkManager,
     x = None
     obj_val = None
     iter_count = 0
+    cg_iter_count = 1
 
     while is_not_optimal:
 
@@ -119,6 +124,10 @@ def column_generation(net_manager: NetworkManager,
         num_vars_in_next_subproblem = int(COLUMN_GENERATION_RATIO * num_vars_in_next_subproblem)
         left_pointer = right_pointer
         iter_count += sub_output.iter_count
+
+        print(f"***  CG iteration {cg_iter_count} completed. ***")
+        cg_iter_count += 1
+
 
     timer.end_timer()
     return Output(x=x, obj_val=obj_val, runtime=timer.total_duration, iter_count=iter_count, basis=net_manager.basis)

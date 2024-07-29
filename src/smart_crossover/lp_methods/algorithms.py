@@ -33,6 +33,8 @@ def run_perturb_algorithm(lp: GeneralLP,
          the output of the perturbed algorithm.
 
     """
+
+    print(f"*** Running the perturbation crossover algorithm... ***")
     barrier_output = solve_lp(lp, solver,
                               method='barrier',
                               settings=SolverSettings(barrierTol=barrierTol, presolve='on', crossover='off', log_file=log_file))
@@ -42,6 +44,7 @@ def run_perturb_algorithm(lp: GeneralLP,
     gamma, gamma_dual = OPTIMAL_FACE_ESTIMATOR, OPTIMAL_FACE_ESTIMATOR
     while True:
 
+        print(f"*** Getting and solving a perturb subproblem... ***")
         perturbLP_manager = get_perturb_problem(lp, barrier_output.x, barrier_output.y, gamma, gamma_dual, is_feas=is_feas_problem)
 
         perturb_barrier_output = solve_lp(perturbLP_manager.lp_sub, solver=solver,
@@ -53,10 +56,15 @@ def run_perturb_algorithm(lp: GeneralLP,
         if perturb_barrier_output.status == 'INFEASIBLE' or perturb_barrier_output.status =='UNBOUNDED':
             gamma = gamma * OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO
             gamma_dual = gamma_dual * OPTIMAL_FACE_ESTIMATOR_UPDATE_RATIO ** 2
+            print(f"*** The perturbation is infeasible or unbounded. Increasing the optimal face and try again... ***")
         else:
             break
 
-    check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, lp.c, barrier_output.obj_val)
+    is_optimal = check_perturb_output_precision(perturbLP_manager, perturb_barrier_output.x, lp.c, barrier_output.obj_val)
+
+    if is_optimal:
+        print(f"*** A primal optimal BFS is found. ***")
+        return perturb_barrier_output
 
     final_output = solve_lp(lp, solver=solver,
                             method='simplex' if solver == 'MSK' else 'primal_simplex',
@@ -65,9 +73,7 @@ def run_perturb_algorithm(lp: GeneralLP,
                                                  perturb_barrier_output.y),
                             warm_start_basis=perturbLP_manager.recover_basis_from_sub_basis(perturb_barrier_output.basis))
 
-    return Output(x=final_output.x,
-                  y=final_output.y,
-                  obj_val=final_output.obj_val)
+    return final_output
 
 
 def get_perturb_problem(lp: GeneralLP,
@@ -99,8 +105,8 @@ def get_perturb_problem(lp: GeneralLP,
     subLP_manager.fix_variables(ind_fix_to_low=np.where(x - lp.l < gamma * s_d)[0],
                                 ind_fix_to_up=np.where(lp.u - x < gamma * -s_d)[0])
     subLP_manager.fix_constraints(ind_fix_to_up=np.where(s_p < gamma_dual * -y)[0])
-    logging.critical("  The number of fixed variables is %d." % subLP_manager.get_num_fixed_variables())
-    logging.critical("  The number of fixed constraints is %d." % subLP_manager.get_num_fixed_constraints())
+    print(f"  The number of fixed variables is %d." % subLP_manager.get_num_fixed_variables())
+    print(f"  The number of fixed constraints is %d." % subLP_manager.get_num_fixed_constraints())
     subLP_manager.update_subproblem()
 
     return subLP_manager
@@ -138,8 +144,8 @@ def perturb_c(lp: GeneralLP,
 
     projector = get_projector_Xc(lp, x_real)
     scale_factor = get_scale_factor(projector, n + np.count_nonzero(lp.sense == '<'))
-    logging.critical("  Projector: %(pj)s, \n  Scale factor: %(sf)s",
-                     {'pj': np.linalg.norm(projector), 'sf': scale_factor})
+    # logging.critical("  Projector: %(pj)s, \n  Scale factor: %(sf)s",
+    #                  {'pj': np.linalg.norm(projector), 'sf': scale_factor})
 
     p = np.minimum(p / x_real * scale_factor / CONSTANT_SCALE_FACTOR, PERTURB_UPPER_BOUND)
     p[lp.get_free_ind()] = 0
@@ -208,7 +214,8 @@ def check_perturb_output_precision(sublp_manager: LPManager,
     my_primal_obj = c_ori @ x
     primal_dual_gap = abs(my_primal_obj - barrier_obj)
     relative_primal_dual_gap = primal_dual_gap / (abs(my_primal_obj) + abs(barrier_obj) + 1)
-    logging.critical("  Primal-dual gap: %(gap).2e", {'gap': relative_primal_dual_gap})
+    print()
+    print(f"*** Primal-dual gap: %(gap).2e ***" % {'gap': relative_primal_dual_gap})
     if relative_primal_dual_gap < PRIMAL_DUAL_GAP_THRESHOLD:
         return True
 
@@ -217,8 +224,8 @@ def check_feasibility_problem(lp: GeneralLP) -> bool:
     """ Check if the problem is a feasibility problem. """
     proj_c = get_projector_c(lp)
     if np.linalg.norm(proj_c) / np.linalg.norm(lp.c) < PROJECTOR_THRESHOLD:
+        print("*** The problem is a feasibility problem. ***")
         return True
-    logging.critical(f"  ...{np.linalg.norm(proj_c) / np.linalg.norm(lp.c)}")
     return False
 
 
@@ -241,7 +248,6 @@ def apply_projector_qp(A: sp.csr_matrix, v: np.ndarray, A_f: sp.csr_matrix = Non
     if A_f is None:
         ls.addConstr(A @ x == 0)
     else:
-        print("FREE VARIABLE DETECTED")     # TODO: remove this line
         f = ls.addMVar(shape=A_f.shape[1], lb=float('-inf'))
         ls.addConstr(A @ x + A_f @ f == 0)
 
