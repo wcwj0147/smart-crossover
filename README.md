@@ -25,7 +25,7 @@ To set up the required environment, follow these steps:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/your-repo/smart-crossover.git
+   git clone https://github.com/wcwj0147/smart-crossover.git
    cd smart-crossover
    ```
 2. Create the environment using `environment.yml`:
