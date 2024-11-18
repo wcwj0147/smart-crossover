@@ -7,21 +7,31 @@ Check out the paper [From an Interior Point to a Corner Point: Smart Crossover](
 This package provides methods described in the paper.
 
 
-Structure of the Code
-=====================
-There are two major algorithms included:
-the network crossover methods in 
-`smart_crossover.network_methods` and perturbation crossover
-methods in `smart_crossover.lp_methods`.
+## Description
 
-The problem types that can be solved are listed in `smart-crossover.format`.
+The goal of this software is to implement the crossover algorithms proposed in the paper.
 
-Installation
-==============
+### Structure of 'src'
 
-### Setting Up the Environment
+`smart_crossover.formats` contains the problem structures used in the project, including LP, min-cost flow, and optimal transport.
 
-To set up the required environment, follow these steps:
+`smart_crossover.parameters` collects the parameters used in the algorithms.
+
+`smart_crossover.output` and `smart_crossover.timer` are output and timer classes.
+
+The two main algorithms included:
+the **network crossover** methods in 
+`smart_crossover.network_methods` and **perturbation crossover**
+methods in `smart_crossover.lp_methods`. 
+
+In both cases, there is a `algorithm` module that contains the main algorithm
+and a `managemer` module that provides utilities for managing the algorithm.
+
+
+
+## Building
+
+Follow these steps to set up the environment:
 
 1. Install Miniconda
 
@@ -29,27 +39,44 @@ You need to have [Miniconda](https://docs.conda.io/en/latest/miniconda.html) ins
 
 2. Clone the repository:
    ```
-   git clone https://github.com/wcwj0147/smart-crossover.git
+   git clone https://github.com/INFORMSJoC/2022.0291.git
    cd smart-crossover
    ```
 3. Create the environment using `environment.yml`:
    ```
-   conda env create -f environment.yml -n smart-crossover
+   conda env create -f environment.yml -n smart_crossover
    ```
-   You can also install Cplex and Mosek manually if necessary.
+   **An important remark**: we use Gurobi 9.0.3, Cplex 12.9.0, and Mosek 9.3.14 in this project. If you have a different version of these solvers, you may need to modify the `environment.yml` file to match your version.
    
 4. Activate the environment:
    ```
-   conda activate smart-crossover
+   conda activate smart_crossover
    ```
-
-### Jupyter Notebook Integration
 
 To use the environment with Jupyter Notebook, install the environment as a Jupyter kernel when the environment is activated:
 
-1. Install the Jupyter kernel:
+Install the Jupyter kernel:
   ```
-  python -m ipykernel install --user --name=smart-crossover  
+  python -m ipykernel install --user --name=smart_crossover  
   ```
-2. Open the Jupyter notebook and select the environment `smart-crossover`.
 
+
+## Usage example
+
+Open `/notebooks/example.ipynb`, activate the environment, and run the notebook to test the algorithm.
+
+
+## How to reproduce the results
+
+1. Prepare the data:
+   Follow the instruction in `data/README.md` to get the initial data.
+
+2. Build the environment:
+   Follow the instruction in the `Building` section to build the environment.
+
+3. Run the experiments:
+   For the network crossover results, run the script `scripts/run_network_crossover.py`.
+   For the perturbation crossover results, run the script `scripts/run_perturb_crossover.py`.
+
+4. Analyze the results:
+   Follow the instruction in `notebooks/network_result_analysis.ipynb` and `notebooks/perturb_result_analysis.ipynb` to analyze the results.
