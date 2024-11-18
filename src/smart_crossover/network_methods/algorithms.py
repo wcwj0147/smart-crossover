@@ -32,7 +32,6 @@ def network_crossover(
 
     Returns:
         the output of the selected algorithm.
-
     """
 
     print(f"*** Running {method} algorithm. ***")
@@ -83,6 +82,18 @@ def column_generation(net_manager: NetworkManager,
                       queue: np.ndarray,
                       solver: str,
                       solver_settings: SolverSettings) -> Output:
+    """
+    Run the column generation algorithm.
+
+    Args:
+        net_manager: network manager for the problem.
+        queue: a list of flows sorted by the flow indicators. Add the flows in the queue to the subproblem in sequence.
+        solver: solver to use for the subproblem.
+        solver_settings: settings when solving the subproblem.
+
+    Returns:
+        the output of the final solution.
+    """
 
     # Initialize the column generation.
     timer = Timer()

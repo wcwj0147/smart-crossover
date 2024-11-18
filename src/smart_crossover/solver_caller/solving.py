@@ -12,6 +12,12 @@ from smart_crossover.solver_caller.mosek import MskCaller
 
 def generate_solver_caller(solver: str = "GRB",
                            solver_settings: SolverSettings = SolverSettings()) -> SolverCaller:
+    """Generate a solver caller based on the solver specified and settings.
+
+    Args:
+        solver: The solver to be used. Choose from 'GRB', 'CPL' and 'MSK'.
+        solver_settings: The settings for the solver.
+    """
     if solver == "GRB":
         caller = GrbCaller(solver_settings)
     elif solver == "CPL":
@@ -28,6 +34,15 @@ def solve_problem(solver_caller: SolverCaller,
                   settings: SolverSettings,
                   warm_start_basis: Optional[Basis] = None,
                   warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
+    """Solve the problem using the specified method.
+
+    Args:
+        solver_caller: The solver caller to be used.
+        method: The method to be used. Choose from 'default', 'barrier', 'simplex', 'network_simplex', 'primal_simplex', 'dual_simplex'.
+        settings: The settings for the solver.
+        warm_start_basis: A warm start basis to be used.
+        warm_start_solution: A warm start solution to be used.
+    """
     if method in ["default", "simplex", "network_simplex", "primal_simplex", "dual_simplex"]:
         if warm_start_solution is not None:
             solver_caller.add_warm_start_solution(warm_start_solution)
@@ -59,6 +74,16 @@ def solve_lp(lp: Union[GeneralLP, StandardLP],
              settings: SolverSettings = SolverSettings(),
              warm_start_basis: Optional[Basis] = None,
              warm_start_solution: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Output:
+    """Solve the LP problem.
+
+    Args:
+        lp: The LP problem to be solved.
+        solver: The solver to be used. Choose from 'GRB', 'CPL' and 'MSK'.
+        method: The method to be used. Choose from 'default', 'barrier', 'simplex', 'network_simplex', 'primal_simplex', 'dual_simplex'.
+        settings: The settings for the solver.
+        warm_start_basis: A warm start basis to be used.
+        warm_start_solution: A warm start solution to be used.
+    """
     solver_caller = generate_solver_caller(solver, settings)
     if isinstance(lp, StandardLP):
         solver_caller.read_stdlp(lp)
@@ -74,6 +99,15 @@ def solve_mcf(mcf: MinCostFlow,
               method: str = "default",
               settings: SolverSettings = SolverSettings(),
               warm_start_basis: Optional[Basis] = None) -> Output:
+    """Solve the MCF problem.
+
+    Args:
+        mcf: The MCF problem to be solved.
+        solver: The solver to be used. Choose from 'GRB', 'CPL' and 'MSK'.
+        method: The method to be used. Choose from 'default', 'barrier', 'simplex', 'network_simplex', 'primal_simplex', 'dual_simplex'.
+        settings: The settings for the solver.
+        warm_start_basis: A warm start basis to be used.
+    """
     solver_caller = generate_solver_caller(solver, settings)
     solver_caller.read_mcf(mcf)
     return solve_problem(solver_caller, method, settings, warm_start_basis)
@@ -84,6 +118,16 @@ def solve_ot(ot: OptTransport,
              method: str = "default",
              settings: SolverSettings = SolverSettings(),
              warm_start_basis: Optional[Basis] = None) -> Output:
+    """Solve the OT problem.
+
+    Args:
+        ot: The OT problem to be solved.
+        solver: The solver to be used. Choose from 'GRB', 'CPL' and 'MSK'.
+        method: The method to be used. Choose from 'default', 'barrier', 'simplex', 'network_simplex', 'primal_simplex', 'dual_simplex'.
+        settings: The settings for the solver.
+        warm_start_basis: A warm start basis to be used.
+    """
+
     solver_caller = generate_solver_caller(solver, settings)
     solver_caller.read_ot(ot)
     return solve_problem(solver_caller, method, settings, warm_start_basis)

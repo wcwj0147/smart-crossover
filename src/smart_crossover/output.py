@@ -19,6 +19,22 @@ class Basis:
 
 @dataclass(frozen=True)
 class Output:
+    """Output of solution of a LP model
+
+    Attributes:
+        x: Vertex solution of the primal.
+        y: Vertex solution of the dual.
+        x_bar: Interior-point solution of the primal.
+        obj_val: Objective value.
+        runtime: Runtime of the algorithm.
+        iter_count: Number of iterations.
+        bar_iter_count: Number of barrier iterations.
+        rcost: Reduced costs.
+        basis: Basis information.
+        status: Status of the solution.
+
+    """
+
     x: Optional[np.ndarray] = None
     y: Optional[np.ndarray] = None
     x_bar: Optional[np.ndarray] = None

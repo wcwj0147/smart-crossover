@@ -23,16 +23,22 @@ Installation
 
 To set up the required environment, follow these steps:
 
-1. Clone the repository:
+1. Install Miniconda
+
+You need to have [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed to manage the environment. Download and install Miniconda by following the [official instructions](https://docs.conda.io/en/latest/miniconda.html).
+
+2. Clone the repository:
    ```
    git clone https://github.com/wcwj0147/smart-crossover.git
    cd smart-crossover
    ```
-2. Create the environment using `environment.yml`:
+3. Create the environment using `environment.yml`:
    ```
    conda env create -f environment.yml -n smart-crossover
    ```
-3. Activate the environment:
+   You can also install Cplex and Mosek manually if necessary.
+   
+4. Activate the environment:
    ```
    conda activate smart-crossover
    ```

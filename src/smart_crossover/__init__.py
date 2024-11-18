@@ -2,6 +2,7 @@ from pathlib import Path
 
 
 def get_project_root():
+    """Get the root directory of the project."""
     current_directory = Path.cwd()
     project_root = current_directory
     while project_root.name != "smart-crossover":
@@ -12,4 +13,5 @@ def get_project_root():
 
 
 def get_data_dir_path() -> Path:
+    """Get the data directory path."""
     return get_project_root() / "data"

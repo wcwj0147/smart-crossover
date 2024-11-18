@@ -10,6 +10,17 @@ from smart_crossover.output import Basis
 
 
 def tree_basis_identify(ot_manager: OTManager, flow_weights: np.ndarray) -> Tuple[Basis, int]:
+    """ Identify a basis for the OT problem using the tree basis identification algorithm with 2 steps:
+    1. Find a max-weight spanning tree.
+    2. Push the tree solution (basic solution)  to a basic feasible solution of the OT problem.
+
+    Args:
+        ot_manager: The OT manager.
+        flow_weights: The weights of the flows, usually a non-exact solution from some first-order method.
+
+    Returns:
+        The basis and the number of push iterations.
+    """
     # Find a max-weight spanning tree.
     tree = max_weight_spanning_tree(ot_manager.ot, flow_weights)
     # Push the tree to a basic feasible solution of the OT problem.
@@ -19,7 +30,15 @@ def tree_basis_identify(ot_manager: OTManager, flow_weights: np.ndarray) -> Tupl
 
 
 def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.ndarray:
-    """ Find the maximum weight spanning tree of the graph defined by the OT problem using scipy.sparse.csgraph. """
+    """ Find the maximum weight spanning tree of the graph defined by the OT problem using scipy.sparse.csgraph.
+
+    Args:
+        ot: The OT problem.
+        flow_weights: The weights of the flows.
+
+    Returns:
+        The indices of the edges in the maximum weight spanning tree.
+    """
     s_num, d_num = ot.M.shape
     total_node_num = s_num + d_num
 
@@ -41,6 +60,16 @@ def max_weight_spanning_tree(ot: OptTransport, flow_weights: np.ndarray) -> np.n
 
 
 def push_tree_to_bfs(ot_manager: OTManager, tree: np.ndarray) -> Tuple[np.ndarray, int]:
+    """ Push the tree solution to a basic feasible solution of the OT problem.
+
+    Args:
+        ot_manager: The OT manager.
+        tree: The indices of the edges in the starting tree solution (might be infeasible for the OT).
+
+    Returns:
+        A feasible tree basis and the number of push iterations.
+    """
+
     ot = ot_manager.ot
     B = ot_manager.mcf.A.tocsc()[:-1, :][:, tree]
     # tree_solution is the solution of the equation: B * x = ot_manager.mcf.b[:-1]

@@ -24,18 +24,23 @@ class GeneralLP:
     name: str = "lp_instance"
 
     def __post_init__(self) -> None:
+        """ Check the validity of the LP model: only allow <= and = constraints. """
         assert np.all(np.logical_or(self.sense == '=', self.sense == '<'))
 
     def get_free_ind(self) -> np.ndarray:
+        """ Get the indices of free variables."""
         return np.where(np.logical_and(self.l == -np.inf, self.u == np.inf))[0]
 
     def get_nonfree_ind(self) -> np.ndarray:
+        """ Get the indices of non-free variables."""
         return np.setdiff1d(np.arange(self.get_standard_c().size), self.get_free_ind())
 
     def get_free_var_matrix(self) -> sp.csr_matrix:
+        """ Get columns of the A matrix corresponding to free variables."""
         return self.A[:, self.get_free_ind()]
 
     def get_nonfree_var_matrix(self) -> sp.csr_matrix:
+        """ Get columns of the A matrix corresponding to non-free variables."""
         return self.get_standard_A().tocsr()[:, self.get_nonfree_ind()]
 
     def get_standard_A(self) -> sp.csr_matrix:
@@ -45,21 +50,33 @@ class GeneralLP:
         return A_new.tocsr()
 
     def get_standard_c(self) -> np.ndarray:
+        """ Added slack variables cost (0) to the original cost vector."""
         return np.hstack([self.c, np.zeros(np.sum(self.sense == "<"))])
 
     def get_standard_x(self, x: np.ndarray) -> np.ndarray:
-        """ Added slack variables to the original variable vector, which may represent a cost vector or a solution vector."""
+        """ Added slack variables to the original variable vector, which may represent a cost vector or a solution vector.
+
+        Args
+            x: The original vector.
+
+        Returns:
+            b_{<=} - A_{<=}x
+
+        """
         assert np.all(np.logical_or(self.sense == '=', self.sense == '<'))
         slack_ind = np.where(self.sense == "<")[0]
         return np.hstack([x, self.b[slack_ind] - self.A[slack_ind, :] @ x])
 
     def get_dual_slack(self, y: np.ndarray) -> np.ndarray:
+        """ Calculate the dual slackness given a dual solution y."""
         return self.c - self.A.transpose() @ y
 
     def get_primal_slack(self, x: np.ndarray) -> np.ndarray:
+        """ Calculate the primal slackness given a primal solution x."""
         return self.b - self.A @ x
 
     def copy(self) -> GeneralLP:
+        """ Return a copy of the LP model."""
         return GeneralLP(self.A.copy(), self.b.copy(), self.c.copy(), self.l.copy(), self.u.copy(), self.sense.copy(), self.name)
 
 
@@ -96,6 +113,7 @@ class MinCostFlow(StandardLP):
     name: str = "mcf_instance"
 
     def __post_init__(self) -> None:
+        """ Check the validity of the min-cost flow model."""
         if self.l is None:
             self.l = np.zeros_like(self.u)
         self.A = self.A.tocsr()
@@ -122,6 +140,7 @@ class OptTransport:
     name: str = "ot_instance"
 
     def __post_init__(self) -> None:
+        """ Check the validity of the optimal transport problem."""
         if not np.isclose(np.sum(self.s), np.sum(self.d), atol=1e-8):
             raise ValueError("The sum of the s and d arrays must be the same.")
 
