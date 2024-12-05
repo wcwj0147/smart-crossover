@@ -1,7 +1,6 @@
 Smart crossover algorithms.
 
-Getting Started with the Problem
-================================
+## Getting Started with the Problem
 
 Check out the paper [From an Interior Point to a Corner Point: Smart Crossover](https://arxiv.org/abs/2102.09420/).
 This package provides methods described in the paper.
